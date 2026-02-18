@@ -87,7 +87,7 @@ export const lesson = {
             },
             {
                 id: "se3er",
-                ar: "سِعْر",
+                ar: "سِعِر",
                 en: "price",
                 enArabeezy: "siʿer / se3er",
                 hint: "How much something costs.",
@@ -323,12 +323,12 @@ export const lesson = {
             },
             {
                 id: "akher_se3er",
-                ar: "آخِر سِعْر؟",
+                ar: "آخِر سِعِر؟",
                 en: "What’s your final price?",
                 enArabeezy: "ā5er se3er? / akher se3er?",
                 hint:
                     "Used in bargaining when you want the lowest price.",
-                exampleAr: "يَعْنِي هَادَا آخِر سِعْر وَلّا فِيه نْقَاص كْمَان؟",
+                exampleAr: "يَعْنِي هَادَا آخِر سِعِر وَلّا فِيه نْقَاص كْمَان؟",
                 exampleArabeezy: "y3ny hada aakhr s3r wla fyh nqas kman?",
                 exampleEn: "So is this your final price or can you go lower?",
             },
@@ -436,7 +436,7 @@ export const lesson = {
             },
             {
                 "speaker": "Yousef",
-                "ar": "سَلام عَليكم، قَدّيش سِعْر هاد القَمِيص؟",
+                "ar": "سَلام عَليكم، قَدّيش سِعِر هاد القَمِيص؟",
                 "arArabeezy": "slam 3lykm, qdysh s3r had elqmys?",
                 "en": "Peace be upon you, how much is this shirt?"
             },
@@ -723,7 +723,7 @@ Avoid long ordinal lists.`,
                 id: "mc_complete_2",
                 type: "complete",
                 prompt: "Complete the Arabic sentence for: Honestly, this is a bit expensive.\nصَرَاحَةً هَادَا ___ شْوَيّ.",
-                options: ["سِعْر", "قَدِّيش هَادَا؟", "غالي", "رخيص", "تَنْزيلات"],
+                options: ["سِعِر", "قَدِّيش هَادَا؟", "غالي", "رخيص", "تَنْزيلات"],
                 correct: "غالي",
             },
             {
@@ -751,7 +751,7 @@ Avoid long ordinal lists.`,
                 id: "mc_complete_6",
                 type: "complete",
                 prompt: "Complete the Arabic sentence for: The price is high, can you lower it a bit?\nالسِّعِر عالي، ___",
-                options: ["مُمْكِن تْنَزِّل شْوَيّ؟", "آخِر سِعْر؟", "مِيزانِيّة", "صَفْقَة / لُقْطَة", "اِسْتِبْدال"],
+                options: ["مُمْكِن تْنَزِّل شْوَيّ؟", "آخِر سِعِر؟", "مِيزانِيّة", "صَفْقَة / لُقْطَة", "اِسْتِبْدال"],
                 correct: "مُمْكِن تْنَزِّل شْوَيّ؟",
             },
             {

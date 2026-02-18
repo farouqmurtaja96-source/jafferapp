@@ -88,8 +88,8 @@ export const lesson = {
                 en: "clinic / doctor’s office",
                 enArabeezy: "ʿiyādeh / 3yādeh",
                 hint:
-                    "Smaller than a hospital. عِيادَة صغيرة = small clinic; عِيادَة جامْعِيّة = university clinic.",
-                exampleAr: "في عِيادَة جَوّا الجامْعَة.",
+                    "Smaller than a hospital. عِيادَة جِدْول = small clinic; عِيادَة جامْعِيّة = university clinic.",
+                exampleAr: "في عِيادَة  جَوّا الجامْعَة.",
                 exampleArabeezy: "fy 3yada jwa eljam3a.",
                 exampleEn: "There is a clinic inside the campus.",
 },
@@ -172,7 +172,7 @@ export const lesson = {
                 en: "injection / shot",
                 enArabeezy: "ʾibra / ibra",
                 hint: "Needle injection.",
-                exampleAr: "مُمْكِن تَأْخُد إِبْرَة عشان تنزل الحَرارَة.",
+                exampleAr: "مُمْكِن تَأْخُد إِبْرَة غشان تنزل الحَرارَة.",
                 exampleArabeezy: "mmkn takhd ibra ghshan tnzl el7rara.",
                 exampleEn: "You can take an injection to bring the fever down.",
 },
@@ -376,7 +376,7 @@ export const lesson = {
                 id: "Da3et",
                 ar: "ضَغِط",
                 en: "blood pressure",
-                enArabeezy: "daght",
+                enArabeezy: "ḍaġiṭ / Daġet",
                 hint: "Talk about high or low blood pressure.",
                 exampleAr: "اليوم الضَّغِط عَندُه عالي.",
                 exampleArabeezy: "elywm eldght 3ndh 3aly.",
@@ -483,7 +483,7 @@ export const lesson = {
 },
             {
                 id: "tenaffos_3amiq",
-                ar: "تَنَفُّس عَميق",
+                ar: "نَفُّس عَميق",
                 en: "deep breathing",
                 enArabeezy: "tanaffus ʿamīq / tenaffos 3amiq",
                 hint: "Used in calming / first aid or anxiety situations.",
@@ -567,7 +567,7 @@ export const lesson = {
             {
                 "speaker": "Hala",
                 "ar": "قِسْتِي الحَرارَة؟ حاسّة في سُخونَة؟",
-                "arArabeezy": "qsty el7rara? 7asa fy skhwna?",
+                "arArabeezy": "qsty el7rara?7asa fy skhwna?",
                 "en": "Did you take your temperature? Do you feel feverish?"
             },
             {
@@ -663,7 +663,7 @@ export const lesson = {
             {
                 "speaker": "Doctor",
                 "ar": "في وَجَع بِالبَطْن أَو مَغَص؟ في مَشاكِل بِالتَّنَفُّس؟",
-                "arArabeezy": "fy wj3 belbtn aw mghs? fy mshakl beltnfs?",
+                "arArabeezy": "fy wj3 belbtn aw mghs?fy mshakl beltnfs?",
                 "en": "Any stomach pain or cramps? Any breathing problems?"
             },
             {
@@ -717,7 +717,7 @@ export const lesson = {
             {
                 "speaker": "Hala",
                 "ar": "شُو حَكَالك الدْكتور؟ الأُمور مُطَمْئِنَة؟",
-                "arArabeezy": "shw 7kalk eldktwr? elamwr mtmyna?",
+                "arArabeezy": "shw 7kalk eldktwr?elamwr mtmyna?",
                 "en": "What did the doctor tell you? Is everything reassuring?"
             },
             {

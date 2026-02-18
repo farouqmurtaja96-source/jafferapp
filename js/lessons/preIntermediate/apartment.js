@@ -523,7 +523,7 @@ export const lesson = {
             {
                 "speaker": "Khaled",
                 "ar": "مَبْروك! شُو أَخْبار الشِّقّة؟ كْبيرَة وِلّا صْغيرَة؟",
-                "arArabeezy": "mabrook! shu akhbar esh-sha2a? kbeera wala sgheera?",
+                "arArabeezy": "mbrwk! shw akhbar elshqa?kbyra wla sghyra?",
                 "en": "Congratulations! How is the apartment? Big or small?"
             },
             {
@@ -547,7 +547,7 @@ export const lesson = {
             {
                 "speaker": "Khaled",
                 "ar": "عَأيّ طابِق الشِّقّة؟ العِمارَة فيها أسانْسير؟",
-                "arArabeezy": "3a ay tabiq esh-sha2a? el-3imara fiha asansir?",
+                "arArabeezy": "3ay tabq elshqa?el3mara fyha asansyr?",
                 "en": "On which floor is the apartment? Does the building have an elevator?"
             },
             {
@@ -559,7 +559,7 @@ export const lesson = {
             {
                 "speaker": "Khaled",
                 "ar": "طَيِّب، قَدّيش الإيجار؟ شامِل فاتورَة مَيّ وَكَهْرَبا؟",
-                "arArabeezy": "tayyib, addesh el-ijar? shamel fatoret mayy w kahraba?",
+                "arArabeezy": "tyb, qdysh eliyjar?shaml fatwra my wkhrba?",
                 "en": "Okay, how much is the rent? Does it include water and electricity bills?"
             },
             {
@@ -571,7 +571,7 @@ export const lesson = {
             {
                 "speaker": "Khaled",
                 "ar": "والجيران؟ هاد السُّؤال المُهِم.",
-                "arArabeezy": "wel jiran? had es-su2al el-muhimm.",
+                "arArabeezy": "weljyran?had elswal elmhm.",
                 "en": "And the neighbors? That’s the important question."
             },
             {
@@ -595,7 +595,7 @@ export const lesson = {
             {
                 "speaker": "Khaled",
                 "ar": "جَدّ؟ مِثْل إيش؟",
-                "arArabeezy": "jad? mithl eesh?",
+                "arArabeezy": "jd?mthl iysh?",
                 "en": "Really? Like what?"
             },
             {
@@ -625,13 +625,13 @@ export const lesson = {
             {
                 "speaker": "Rami",
                 "ar": "تمام هَيْ بَتِّصِل... أَلو، مَسّا الخير يا أُسْتاذ سامِر، أنا المُسْتَأجِر الجْديد بالشِّقّة الرّابِعَة.",
-                "arArabeezy": "tmam hay bttisel... alo, masa el-kheir ya ustaz samer, ana el-musta2jer el-jdid bel-sha2a er-rab3a.",
+                "arArabeezy": "tmam hy btsl. . . alw, msa elkhyr ya astadh samr, ana elmstajr eljdyd belshqa elrab3a.",
                 "en": "Okay, I’m calling… Hello, good evening Mr. Samer, I’m the new tenant in the fourth-floor apartment."
             },
             {
                 "speaker": "Landlord",
                 "ar": "مَسّا النّور، أَهْلًا، أكِيد. شُو الأَخْبار؟ في مَشْكِلَة؟",
-                "arArabeezy": "masa en-noor, ahla, akeed. shu el-akhbar? fi mushkila?",
+                "arArabeezy": "msa elnwr, ahla, akyd. shw elakhbar?fy mshkla?",
                 "en": "Good evening, welcome. Sure. What’s up? Is there a problem?"
             },
             {
@@ -672,9 +672,9 @@ export const lesson = {
             },
             {
                 "speaker": "Khaled",
-                "ar": "اِسْأَلُه عَن الأسانْسير، ليش كْثير خَرْبان.",
+                "ar": " اِسْأَلُه عَن الأسانْسير، ليش كْثير خَرْبان.",
                 "arArabeezy": "asalh 3n elasansyr, lysh kthyr khrban.",
-                "en": "Ask him about the elevator, why it’s often broken."
+                "en": " Ask him about the elevator, why it’s often broken."
             },
             {
                 "speaker": "Rami",

@@ -413,7 +413,7 @@ export const lesson = {
             {
                 "speaker": "Mina",
                 "ar": "شو اللي صار يا رينا؟ شكلك متضايقة.",
-                "arArabeezy": "shu elli sar ya rina? shaklek mtdayqa.",
+                "arArabeezy": "shw elly sar ya ryna?shklk mtdayqa.",
                 "en": "What happened, Rina? You look upset."
             },
             {
@@ -534,7 +534,7 @@ export const lesson = {
             {
                 "speaker": "Mina",
                 "ar": "ممكن تعملوا إشي بخصوص الموعد؟ ممكن الباصات تطلع أبكر شوي؟",
-                "arArabeezy": "momken t3melo ishi bikhsous el-mow3ed? momken el-basat tetla3 abkar shway?",
+                "arArabeezy": "mmkn t3mlwa ishy bkhsws elmw3d?mmkn elbasat ttl3 abkr shwy?",
                 "en": "Can you do something about the schedule? Can the buses leave a bit earlier?"
             },
             {
@@ -799,9 +799,9 @@ Use complaints and service situations.`,
             { id: "comp_t1", type: "enToAr", textEn: "The service is slow.", textAr: "الخدمة بطيئة." },
             { id: "comp_t2", type: "arToEn", textEn: "The food is cold.", textAr: "الأكل بارد." },
             { id: "comp_t3", type: "enToAr", textEn: "I want to speak to the manager.", textAr: "بدي أحكي مع المدير." },
-            { id: "comp_t4", type: "arToEn", textEn: "This is not what I ordered.", textAr: "هاد مش اللي طلبته." },
+            { id: "comp_t4", type: "arToEn", textEn: "This is not what I ordered.", textAr: "هذا مش اللي طلبته." },
             { id: "comp_t5", type: "enToAr", textEn: "Can you change it?", textAr: "ممكن تبدّله؟" },
-            { id: "comp_t6", type: "arToEn", textEn: "I'm not satisfied.", textAr: "أنا مش راضي/ة." }
+            { id: "comp_t6", type: "arToEn", textEn: "I'm not satisfied.", textAr: "أنا مش راضي." }
         ],
     },
 

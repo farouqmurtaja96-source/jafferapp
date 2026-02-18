@@ -136,7 +136,7 @@ export const lesson = {
                 exampleEn: "This week I have many projects.",
             },
             {
-                id: "jay_ousbou3",
+                id: "jاي_ousbou3",
                 ar: "الأُسْبُوع الجَّاي",
                 en: "next week",
                 enArabeezy: "il usbou3 il jay",
@@ -146,7 +146,7 @@ export const lesson = {
                 exampleEn: "Next week we will start a new unit.",
             },
             {
-                id: "shahr_jay",
+                id: "shahr_jاي",
                 ar: "الشَّهِر الجَّاي",
                 en: "next month",
                 enArabeezy: "ish-shahr il jay",
@@ -329,12 +329,12 @@ export const lesson = {
             {
                 "speaker": "Omar",
                 "ar": "جَدّ؟ قُول، شُو مُخَطِّط تِعْمِل؟",
-                "arArabeezy": "jad? qool, shu mkhattet t3mel?",
+                "arArabeezy": "jd?qwl, shw mkhtt t3ml?",
                 "en": "Really? Tell me, what are you planning to do?"
             },
             {
                 "speaker": "Malek",
-                "ar": "الأُسْبُوع الجّاي رَح أَبْلِّش تَدْرِيب بِشِرْكَة سوفتْوِير.",
+                "ar": "الأُسْبوع الجّاي رَح أِبْلِّش تَدْرِيب بِشِرْكَة سوفتْوِير.",
                 "arArabeezy": "elasbw3 eljay r7 ablsh tdryb bshrka swftwyr.",
                 "en": "Next week I’ll start an internship at a software company."
             },
@@ -353,7 +353,7 @@ export const lesson = {
             {
                 "speaker": "Omar",
                 "ar": "طيب وإجازَة الصَّيْف؟ رَح تِسافِر وِلّا كُلَّه شُغُل؟",
-                "arArabeezy": "tayyib w ijazet es-seif? ra7 tsafir wala kellu shoghol?",
+                "arArabeezy": "tyb wijaza elsyf?r7 tsafr wla klh shghl?",
                 "en": "And the summer vacation? Will you travel or is it all work?"
             },
             {
@@ -371,7 +371,7 @@ export const lesson = {
             {
                 "speaker": "Malek",
                 "ar": "وبَعْدين؟ بَعْد التَّخَرُّج، شُو ناوي تِعْمِل؟",
-                "arArabeezy": "w ba3deen? ba3d et-takharruj, shu nawi t3mel?",
+                "arArabeezy": "wb3dyn?b3d eltkhrj, shw nawy t3ml?",
                 "en": "And then? After graduation, what do you intend to do?"
             },
             {
@@ -383,7 +383,7 @@ export const lesson = {
             {
                 "speaker": "Malek",
                 "ar": "مش مستعجل شوي؟ هاد شغل كتير على شخص واحد.",
-                "arArabeezy": "mish mista3jil shway? had shoghol kteer 3ala shakhs wa7ad.",
+                "arArabeezy": "msh mst3jl shwy?had shghl ktyr 3la shkhs wa7d.",
                 "en": "Aren’t you rushing it a bit? It’s a lot of work for one person."
             },
             {
@@ -443,7 +443,7 @@ export const lesson = {
             {
                 "speaker": "Malek",
                 "ar": "تِصَدِّق؟ قَبِل، كُنْت أُخَطِّط كْثير وبَس ولا إِشِي يِصِير!",
-                "arArabeezy": "tsaddaq? qabl, kint akhtt kteer w bas wala ishi yseer!",
+                "arArabeezy": "tsdq?qbl, knt akhtt kthyr wbs wla ishy ysyr!",
                 "en": "You know what? Before, I used to plan a lot and then nothing happened!"
             },
             {
@@ -491,7 +491,7 @@ export const lesson = {
             {
                 "speaker": "Malek",
                 "ar": "وإنت؟ شُو أَكْبَر هَدَف لَك لَلْمُسْتَقْبَل؟",
-                "arArabeezy": "w enta? shu akbar hadaf lak lel-mustaqbal?",
+                "arArabeezy": "wint?shw akbr hdf lk lelmstqbl?",
                 "en": "And you? What is your biggest goal for the future?"
             },
             {

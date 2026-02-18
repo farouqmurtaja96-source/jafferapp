@@ -31,7 +31,7 @@ export const lesson = {
                 id: "taleb",
                 ar: "طالِب / طالْبِة",
                 en: "student (m/f)",
-                enArabeezy: "taleb / talbe",
+                enArabeezy: "Taleb / Talbe",
                 hint: "Person who studies at school or university.",
                 exampleAr: "أنا طالْبَة جامْعِيّة.",
                 exampleArabeezy: "ana talba jam3ya.",
@@ -287,12 +287,12 @@ export const lesson = {
 },
             {
                 id: "dawam_kamel",
-                ar: "دَوام كامِل",
+                ar: "بِدَوَّام كامِل",
                 en: "full-time",
-                enArabeezy: "dawam_kamel",
+                enArabeezy: "bidawwam_kamel",
                 hint: "Full-time work or study schedule.",
-                exampleAr: "أَبوي بِشْتِغِل دَوام كامِل.",
-                exampleArabeezy: "abwy bishtighil dawam kamil.",
+                exampleAr: "أَبوي بِشْتِغِل بِدَوَّام كامِل.",
+                exampleArabeezy: "abwy bshtghl bdwam kaml.",
                 exampleEn: "My father works full-time.",
 },
             {
@@ -528,14 +528,14 @@ export const lesson = {
             },
             {
                 "speaker": "Sara",
-                "ar": "صباح الخير يا مجد، جدّ جدولي مليان! عندي جامعة وشغل.",
-                "arArabeezy": "sba7 elkhyr ya mjd, jd jdwly malyaneh! 3ndy jam3a wshghl.",
-                "en": "Good morning, Majd, my schedule is full! I have university and work."
+                "ar": "صباح الخير يا مجد، جدّ جدولي ملخبط! عندي جامعة وشغل.",
+                "arArabeezy": "sba7 elkhyr ya mjd, jd jdwly mlkhbt! 3ndy jam3a wshghl.",
+                "en": "Good morning, Majd, my schedule is crazy! I have university and work."
             },
             {
                 "speaker": "Majd",
                 "ar": "جَدّ؟ وين بَشْتِغِلي؟",
-                "arArabeezy": "jad? wein bteshtghli?",
+                "arArabeezy": "jd?wyn bshtghly?",
                 "en": "Really? Where do you work?"
             },
             {
@@ -546,20 +546,20 @@ export const lesson = {
             },
             {
                 "speaker": "Majd",
-                "ar": "كم ساعة بتشتغلي وكم يوم بتدوامي؟",
-                "arArabeezy": "Kam sa3a bteshtghli w kam yom btdewami?",
-                "en": "How many hours do you work, and how many days do you work?"
+                "ar": "قدّيش ساعات شغلك؟ وكم يوم بتدوامي",
+                "arArabeezy": "qdysh sa3at shghlk?wkm ywm btdwamy",
+                "en": "How long are your work hours? And how many days do you work?"
             },
             {
                 "speaker": "Sara",
-                "ar": "مِن الاتنين لَلخَميس، مِن السّاعَة 2 لَ 5.",
+                "ar": "مِن التّْنين لَلخَميس، مِن السّاعَة تْنين لَلْخَمْسَة.",
                 "arArabeezy": "mn eltnyn lelkhmys, mn elsa3a tnyn lelkhmsa.",
                 "en": "From Monday to Thursday, from two o’clock to five."
             },
             {
                 "speaker": "Majd",
                 "ar": "وطَبْعًا قبل هيك عَندِك مُحاضَرات بِالجامْعَة؟",
-                "arArabeezy": "w tab3an, qabl heik 3indek mo7adarat bel-jam3a?",
+                "arArabeezy": "wtb3a qbl hyk 3ndk m7adrat beljam3a?",
                 "en": "And of course before that you have lectures at the university?"
             },
             {
@@ -570,14 +570,14 @@ export const lesson = {
             },
             {
                 "speaker": "Majd",
-                "ar": "مش حاسة إنو ما عندِك وقت فراغ؟",
-                "arArabeezy": "Mish 7asseh enno ma 3indik wa2et faraagh?",
+                "ar": "ما بِتْحِسّي إنّو ما عِنْدِك وَقْت فاضي؟",
+                "arArabeezy": "ma bt7sy inw ma 3ndk wqt fady?",
                 "en": "Don’t you feel like you have no free time?"
             },
             {
                 "speaker": "Sara",
-                "ar": "بصِراحَةً، نادِرًا ما بْلاقي وَقْت فراغ. لاِزِم أَدْرُس لِلْمَشْروع وِلْاِمْتِحانات كْمان.",
-                "arArabeezy": "bsra7a, nadra ma blaqy wqt faraagh. lazm adrs lelmshrw3 wlamt7anat kman.",
+                "ar": "بصِراحَةً، نادِرًا ما بْلاقي وَقْت فاضي. لاِزِم أَدْرُس لِلْمَشْروع وِلْاِمْتِحانات كْمان.",
+                "arArabeezy": "bsra7a, nadra ma blaqy wqt fady. lazm adrs lelmshrw3 wlamt7anat kman.",
                 "en": "Honestly, I rarely find free time. I have to study for the project and for exams too."
             },
             {
@@ -770,7 +770,7 @@ Keep numbers consistent with learner level.`,
                 id: "mc_match_5",
                 type: "match",
                 prompt: "Match the English word to Arabic: break",
-                options: ["اِسْتِراحَة", "شُغُل", "وَظِيفَة", "دْوَام / دَوام", "دَوام كامِل"],
+                options: ["اِسْتِراحَة", "شُغُل", "وَظِيفَة", "دْوَام / دَوام", "بِدَوَّام كامِل"],
                 correct: "اِسْتِراحَة",
             },
             {

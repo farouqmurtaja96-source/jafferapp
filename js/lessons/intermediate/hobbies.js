@@ -67,7 +67,7 @@ export const lesson = {
                 exampleAr: "بوقت فراغي بسمع موسيقى هادية.",
                 exampleArabeezy: "bwqt fraghy bsm3 mwsyqa hadya.",
                 exampleEn: "In my free time I listen to calm music.",
-},
+},////////////////
             {
                 id: "kitaab",
                 ar: "كِتَاب",
@@ -286,7 +286,7 @@ export const lesson = {
             },
             {
                 speaker: "Noor",
-                ar: "رُوبَا، عَادَةً كِيف بْتِقْضِي وَقْت فَرَاغك؟",
+                ar: "رُوبَا، عَادَةً كِيف بْتِقْضِي وفت فراغك؟",
                 en: "Roba, how do you usually spend your free time?",
             },
             {
@@ -311,7 +311,7 @@ export const lesson = {
             },
             {
                 speaker: "Roba",
-                ar: "أَيُّوَه، بَسْتِرِيح وَبَتْسَلَّى. وَإِنْتِي، مَع مِين أَكْثَر شِي بْتِقْضِي وَقْت فَرَاغك؟",
+                ar: "أَيُّوَه، بَسْتِرِيح وَبَتْسَلَّى. وَإِنْتِي، مَع مِين أَكْثَر شِي بتقضي وفت فراغك؟",
                 en: "Yes, I relax and have fun. And you, with whom do you mostly spend your free time?",
             },
             {

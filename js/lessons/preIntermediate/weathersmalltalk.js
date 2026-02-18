@@ -225,11 +225,11 @@ export const lesson = {
             },
             {
                 id: "fasl",
-                ar: "فَصْل",
+                ar: "فَصِل",
                 en: "season",
                 enArabeezy: "faSl / faSel",
                 hint: "Plural: فُصُول.",
-                exampleAr: "شُو أَحْلَى فَصْل عِنْدَك؟",
+                exampleAr: "شُو أَحْلَى فَصِل عِنْدَك؟",
                 exampleArabeezy: "shw a7la fsl 3ndk?",
                 exampleEn: "What’s your favourite season?",
             },
@@ -259,7 +259,7 @@ export const lesson = {
                 en: "spring",
                 enArabeezy: "rabee3",
                 hint: "",
-                exampleAr: "الرَّبِيع فَصْل مُناسِب لِلْمَشِي.",
+                exampleAr: "الرَّبِيع فَصِل مُناسِب لِلْمَشِي.",
                 exampleArabeezy: "elrby3 fsl mnasb lelmshy.",
                 exampleEn: "Spring is a good season for walking.",
             },
@@ -401,15 +401,15 @@ export const lesson = {
             },
             {
                 "speaker": "Rania",
-                "ar": "مُمْكِن، بس ممكن تمطر بعد الظهر.",
-                "arArabeezy": "mmkin, bas mmkin timter ba3d e-dohor.",
+                "ar": "مُمْكِن،بس ممكن تمطر بعد الظهر..",
+                "arArabeezy": "mmkn, bs mmkn tmtr b3d elzhr. .",
                 "en": "Maybe, but it might rain this afternoon."
             },
             {
                 "speaker": "Lina",
-                "ar": "إيش بتحبي أكتر؟ الصيف ولا الشتا؟",
-                "arArabeezy": "eesh bte7bi aktar? es-seif wala esh-sheta?",
-                "en": "What do you like more? Summer or winter?"
+                "ar": " إيش بتحبي أكتر؟ الصيف ولا الشتا؟",
+                "arArabeezy": "iysh bt7by aktr?elsyf wla elshta?",
+                "en": " what do you like more? Summer or winter?"
             },
             {
                 "speaker": "Rania",
@@ -487,7 +487,7 @@ export const lesson = {
             {
                 "speaker": "Lina",
                 "ar": "نستنى شوي؟ يمكن الهوا يوقّف.",
-                "arArabeezy": "nistanne shway? yimkin el-hawa yiwqaf.",
+                "arArabeezy": "nstna shwy?ymkn elhwa ywqf.",
                 "en": "Shall we wait a bit? Maybe the rain stops."
             },
             {
@@ -632,7 +632,7 @@ Use real classroom roles.`,
                 id: "mc_choose_4",
                 type: "choose",
                 prompt: "Choose the correct Arabic word for: fog",
-                options: ["ضَباب", "دَرَجَة الحَرارَة", "تَحْت الصِّفِر", "أَبْرَد مِن...", "فَصْل"],
+                options: ["ضَباب", "دَرَجَة الحَرارَة", "تَحْت الصِّفِر", "أَبْرَد مِن...", "فَصِل"],
                 correct: "ضَباب",
             },
             {
