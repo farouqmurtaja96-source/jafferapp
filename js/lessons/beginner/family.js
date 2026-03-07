@@ -227,54 +227,7 @@ export const lesson = {
                 exampleArabeezy: "khalty mthl imy tqryba.",
                 exampleEn: "My aunt is almost like my mother.",
             },
-              {
-    id: "ibn_bint_3amm",
-    ar: "ابن عم / بنت عم",
-    en: "cousin (father’s brother’s son/daughter)",
-    enArabeezy: "ibn 3amm / bint 3amm",
-    hint:
-        "Used for paternal uncle’s children (father’s brother).",
-    exampleAr: "ابن عمي ساكن قريب منا، وبنت عمي بالجامعة.",
-    exampleArabeezy: "ibn 3ammi saken qareeb menna, w bint 3ammi bel-jam3a.",
-    exampleEn: "My uncle’s son lives near us, and his daughter is at university.",
-}
-,
-{
-    id: "ibn_bint_3ammeh",
-    ar: "ابن عمة / بنت عمة",
-    en: "cousin (father’s sister’s son/daughter)",
-    enArabeezy: "ibn 3ammeh / bint 3ammeh",
-    hint:
-        "Used for paternal aunt’s children (father’s sister).",
-    exampleAr: "ابن عمتي مسافر، وبنت عمتي بتشتغل هون.",
-    exampleArabeezy: "ibn 3ammeti msaafer, w bint 3ammeti bteshtghol hon.",
-    exampleEn: "My aunt’s son is traveling, and her daughter works here.",
-},
-
-           {
-    id: "ibn_bint_khal",
-    ar: "ابن خال / بنت خال",
-    en: "cousin (mother’s brother’s son/daughter)",
-    enArabeezy: "ibn khal / bint khal",
-    hint:
-        "Used for maternal uncle’s children (mother’s brother).",
-    exampleAr: "ابن خالي بلعب كرة، وبنت خالي بتحب الرسم.",
-    exampleArabeezy: "ibn khali byel3ab kora, w bint khali bte7eb el-rasem.",
-    exampleEn: "My uncle’s son plays football, and his daughter likes drawing.",
-}
-,
-{
-    id: "ibn_bint_khaleh",
-    ar: "ابن خالة / بنت خالة",
-    en: "cousin (mother’s sister’s son/daughter)",
-    enArabeezy: "ibn khaleh / bint khaleh",
-    hint:
-        "Used for maternal aunt’s children (mother’s sister).",
-    exampleAr: "ابن خالتي بيسكن بغزة، وبنت خالتي برام الله.",
-    exampleArabeezy: "ibn khalti byesken b-Ghaza, w bint khalti b-Ramallah.",
-    exampleEn: "My aunt’s son lives in Gaza, and her daughter is in Ramallah.",
-}
-,
+              
 
             // ===== RELATIVES & PEOPLE =====
             {
@@ -366,37 +319,7 @@ export const lesson = {
                 exampleArabeezy: "akhty mtjwza jdyd.",
                 exampleEn: "My sister recently got married.",
             },
-          {
-  id: "a3zab_3azba",
-  ar: "أعزب / عَزْابية",
-  en: "single (unmarried, m/f)",
-  enArabeezy: "a3zab / 3azba",
-  hint: "أعزب = single (male). عَزْبا = single (female). In spoken Palestinian Arabic, أعزب is often pronounced عَزَب.",
-  exampleAr: "هو أعزب، وأخته عَزْبا.",
-  exampleArabeezy: "howa a3zab, w okhto 3azba.",
-  exampleEn: "He is single, and his sister is unmarried.",
-}
-,
-            {
-                id: "makhtub",
-                ar: "خاطِب / مَخطوبة",
-                en: "engaged (m/f)",
-                enArabeezy: "khatib/makhtubeh",
-                hint: "Engaged to be married.",
-                exampleAr: "أُخوي خاطِب بِنْت مِن غَزّة.",
-                exampleArabeezy: "akhwy khatb bnt mn ghza.",
-                exampleEn: "My brother is engaged to a girl from Gaza.",
-            },
-            {
-                id: "maktub_ktabo",
-                ar: "مَكْتُوب كِتَابُه",
-                en: "engaged (Islamic contract)",
-                enArabeezy: "maktub_ktabo",
-                hint: "Expression for religious engagement/marriage contract. Fem: مَكْتُوب كِتَابْهَا.",
-                exampleAr: "بِنْت خَالْتِي مَكْتُوب كِتَابْهَا مِنْ سَنَة.",
-                exampleArabeezy: "bnt khalty mktwb ktabha mn sna.",
-                exampleEn: "My aunt’s daughter has been engaged for a year.",
-            },
+
               {
     id: "mṭalla2",
     ar: "مطلّق / مطلّقة",
@@ -729,15 +652,22 @@ Avoid heavy grammar terms.`,
                 options: ["أُخْت", "ابن", "بِنْت", "وَلَد / بِنْت", "طِفِل / أَطْفَال"],
                 correct: "ابن",
             },
+             {
+                id: "mc_match_3",
+                type: "match",
+                prompt: "Match the English word to Arabic: twin",
+                options: ["عِيلَة", "أَهْل", "توأم", "إِمّي", "أَخ"],
+                correct: "توأم",
+            },
             {
-                id: "mc_reorder_3",
+                id: "mc_reorder_4",
                 type: "reorder",
                 prompt: "Reorder the Arabic words to match: My grandfather still lives in the village.",
                 options: ["سِيدِي", "لِسَّا", "عَايِش", "فِي", "الْقَرْيَة"],
                 correct: ["سِيدِي", "لِسَّا", "عَايِش", "فِي", "الْقَرْيَة"],
             },
             {
-                id: "mc_choose_4",
+                id: "mc_choose_5",
                 type: "choose",
                 prompt: "Choose the correct Arabic word for: maternal aunt (mother’s sister)",
                 options: ["خَالَة", "وَلاد عَمّي", "وَلاد خالي", "قَرَايِب", "قَريب / قَريبة"],

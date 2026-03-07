@@ -617,22 +617,26 @@ const microCheckState = {
     rotationIndexByLesson: {},
 };
 
-function getVocabMemoryKey(lessonId) {
-    return `pal_vocab_memory_${lessonId || "unknown"}`;
+function getVocabMemoryKey(lessonId, studentId = appState.currentStudentId) {
+    const sid = studentId || "anon";
+    return `pal_vocab_memory_${sid}_${lessonId || "unknown"}`;
 }
 
-function loadVocabMemory(lessonId) {
+function loadVocabMemory(lessonId, studentId = appState.currentStudentId) {
     try {
-        const raw = localStorage.getItem(getVocabMemoryKey(lessonId));
+        const raw = localStorage.getItem(getVocabMemoryKey(lessonId, studentId));
         return raw ? JSON.parse(raw) : {};
     } catch {
         return {};
     }
 }
 
-function saveVocabMemory(lessonId, memory) {
+function saveVocabMemory(lessonId, memory, studentId = appState.currentStudentId) {
     try {
-        localStorage.setItem(getVocabMemoryKey(lessonId), JSON.stringify(memory || {}));
+        localStorage.setItem(
+            getVocabMemoryKey(lessonId, studentId),
+            JSON.stringify(memory || {})
+        );
     } catch { }
 }
 
@@ -1871,6 +1875,7 @@ async function saveStudentsToCloud() {
             goals: s.goals || [],
             progress: s.progress || {},
             homeworkNotes: s.homeworkNotes || {},
+            lastSeen: s.lastSeen || null,
         });
     });
 
@@ -1899,6 +1904,7 @@ async function syncTeacherStudentsFromCloud() {
             goals: d.goals || [],
             progress: d.progress || {},
             homeworkNotes: d.homeworkNotes || {},
+            lastSeen: d.lastSeen || null,
         });
     });
 
@@ -2594,6 +2600,7 @@ function renderStudents() {
             appState.currentStudentId = student.id;
             // If teacher saved a resume spot for this student, go there
             if (!tryResumeStudent(student)) {
+                setStudentLessonContext(student);
                 goToLevels();
             }
         });
@@ -2842,12 +2849,32 @@ function getUseInLifeQuestions(lesson) {
 }
 
 function persistResumeBeforeNav() {
-    // Only save if we are currently in a lesson with an active student
+    // Only save when lesson screen is active for the current student.
+    // Prevents copying previous student's lesson into a newly selected student.
     try {
-        if (appState && appState.currentLessonId && appState.currentStudentId) {
+        const lessonScreen = document.getElementById("lesson-screen");
+        const inLessonScreen = !!(lessonScreen && lessonScreen.classList.contains("screen--active"));
+        if (inLessonScreen && appState && appState.currentLessonId && appState.currentStudentId) {
             saveResumeSpot({ silent: true });
         }
     } catch { }
+}
+
+function getDefaultLessonIdForLevel(level) {
+    switch ((level || "").trim()) {
+        case "Pre-Intermediate":
+            return LESSON_ID_WORK_STUDY;
+        case "Intermediate":
+            return LESSON_ID_OPINIONS;
+        case "Beginner":
+        default:
+            return LESSON_ID_GREETING;
+    }
+}
+
+function setStudentLessonContext(student) {
+    appState.currentLessonId = getDefaultLessonIdForLevel(student?.level);
+    appState.currentTab = "overview";
 }
 
 // =======================
@@ -2885,6 +2912,9 @@ function tryResumeStudent(student) {
     if (!student || !student.lastSeen) return false;
     const { lessonId, tab } = student.lastSeen || {};
     if (!lessonId || !lessons[lessonId]) return false;
+    const lessonLevel = (lessons[lessonId]?.meta?.level || "").trim();
+    const studentLevel = (student.level || "").trim();
+    if (lessonLevel && studentLevel && lessonLevel !== studentLevel) return false;
 
     appState.currentLessonId = lessonId;
     appState.currentTab = tab || "overview";
@@ -3095,10 +3125,14 @@ function closeVocabModal() {
 
 
 function ensureVocabVisitedSet() {
-    if (!appState.vocabCoreVisited[appState.currentLessonId]) {
-        appState.vocabCoreVisited[appState.currentLessonId] = new Set();
+    const sid = appState.currentStudentId || "anon";
+    if (!appState.vocabCoreVisited[sid]) {
+        appState.vocabCoreVisited[sid] = {};
     }
-    return appState.vocabCoreVisited[appState.currentLessonId];
+    if (!appState.vocabCoreVisited[sid][appState.currentLessonId]) {
+        appState.vocabCoreVisited[sid][appState.currentLessonId] = new Set();
+    }
+    return appState.vocabCoreVisited[sid][appState.currentLessonId];
 }
 function maybeAutoCompleteVocab() {
     const lesson = lessons[appState.currentLessonId];
@@ -5578,6 +5612,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // level & teacher buttons
     $("#btnSwitchProfile").addEventListener("click", () => {
+        // Save current lesson position before clearing current student
+        try { persistResumeBeforeNav(); } catch { }
         appState.currentStudentId = null;
         goToStudents();
     });
@@ -5587,7 +5623,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const student = getCurrentStudent();
             if (!student) return;
             if (!tryResumeStudent(student)) {
-                toast("No saved spot yet.");
+                setStudentLessonContext(student);
+                goToLevels();
+                toast("No saved spot yet. Opened this student's level.");
             }
         });
     }
