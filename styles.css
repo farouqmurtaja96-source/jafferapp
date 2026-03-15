@@ -2615,3 +2615,83 @@ select:focus {
         grid-template-columns: 1fr;
     }
 }
+
+/* Drawing layer */
+#drawing-layer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9998;
+    cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIuNSAyNi41TDIuNSAyOS41TDUuNSAxOS41TDIwLjUgNC41TDI3LjUgMTEuNUwxMi41IDI2LjVaIiBmaWxsPSIjMTExODI3Ii8+PHBhdGggZD0iTTE5LjUgNS41TDI2LjUgMTIuNSIgc3Ryb2tlPSIjRkZGIiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=") 2 28, crosshair;
+    touch-action: none;
+    pointer-events: none;
+}
+
+#drawing-toolbar {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 9999;
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    border-radius: 10px;
+    box-shadow: 0 6px 16px rgba(17, 24, 39, 0.12);
+    backdrop-filter: blur(4px);
+}
+
+#drawing-toolbar button {
+    border: 1px solid rgba(17, 24, 39, 0.2);
+    background: #f9fafb;
+    color: #111827;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#drawing-toolbar button.is-active {
+    background: #111827;
+    color: #ffffff;
+    border-color: #111827;
+}
+
+#drawing-toolbar button:hover {
+    background: #e5e7eb;
+}
+
+body.drawing-toolbar-collapsed #drawing-toolbar > :not(#drawToggleBtn) {
+    display: none;
+}
+
+#drawColorInput {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgba(17, 24, 39, 0.2);
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+}
+
+#drawSizeInput {
+    width: 100px;
+}
+
+#drawSizeValue {
+    font-size: 12px;
+    color: #111827;
+    min-width: 34px;
+    text-align: center;
+}
+
+body.drawing-enabled #drawing-layer {
+    pointer-events: auto;
+}
+
+body.drawing-active {
+    cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIuNSAyNi41TDIuNSAyOS41TDUuNSAxOS41TDIwLjUgNC41TDI3LjUgMTEuNUwxMi41IDI2LjVaIiBmaWxsPSIjMTExODI3Ii8+PHBhdGggZD0iTTE5LjUgNS41TDI2LjUgMTIuNSIgc3Ryb2tlPSIjRkZGIiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=") 2 28, crosshair;
+}
