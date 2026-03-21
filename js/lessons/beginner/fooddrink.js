@@ -379,21 +379,21 @@ export const lesson = {
             },
             {
                 id: "zaki",
-                ar: "زَكِي",
+                ar: "زَاكِي",
                 en: "tasty / delicious",
                 enArabeezy: "zaki",
-                hint: "Masc: زَكِي, fem: زَكِيِّة.",
-                exampleAr: "الْأَكِل هُونَا زَكِي كْتِير.",
-                exampleArabeezy: "elakl hwna zky ktyr.",
+                hint: "Masc: زَاكِي, fem: زَاكِيِّة.",
+                exampleAr: "الْأَكِل هُونَ زَاكِي كْتِير.",
+                exampleArabeezy: "elakl hwna zaky ktyr.",
                 exampleEn: "The food here is very tasty.",
             },
             {
                 id: "msh_zaki",
-                ar: "مِش زَكِي",
+                ar: "مِش زَاكِي",
                 en: "not tasty",
                 enArabeezy: "mish_zaki",
                 hint: "Simple way to say you don’t like the taste.",
-                exampleAr: "بصراحة اكِل الْيَوْم مِش زَكِي.",
+                exampleAr: "بصراحة اكِل الْيَوْم مِش زَاكِي.",
                 exampleArabeezy: "bsra7a akl elywm msh zky.",
                 exampleEn: "Honestly, today the food is not tasty.",
             },
@@ -752,7 +752,7 @@ export const lesson = {
             },
             {
                 "speaker": "رامي",
-                "ar": "الْفَلَافِل هُونَ زَكِي كْتِير.",
+                "ar": "الْفَلَافِل هُونَ زَاكِي كْتِير.",
                 "arArabeezy": "elflafl hwna zky ktyr.",
                 "en": "The falafel here is very tasty."
             },
@@ -771,7 +771,7 @@ export const lesson = {
 
             {
                 "speaker": "رامي",
-                "ar": "شُكْرًا كْتِير، الْأَكِل كَان زَكِي.",
+                "ar": "شُكْرًا كْتِير، الْأَكِل كَان زَاكِي.",
                 "arArabeezy": "shkra ktyr, elakl kan zky.",
                 "en": "Thank you very much, the food was delicious."
             },
@@ -1033,7 +1033,7 @@ Use real-life food situations.`,
             { id: "food_t3", type: "enToAr", textEn: "Do you want sugar?", textAr: "بدك سكر؟" },
             { id: "food_t4", type: "arToEn", textEn: "I'm hungry.", textAr: "أنا جوعان/جوعانة." },
             { id: "food_t5", type: "enToAr", textEn: "I eat breakfast at home.", textAr: "أنا باكل فطور بالبيت." },
-            { id: "food_t6", type: "arToEn", textEn: "This is a delicious sandwich.", textAr: "هاذ سندويشة زاكية." },
+            { id: "food_t6", type: "arToEn", textEn: "This is a delicious sandwich.", textAr: "هاد سندويش زاكي." },
         ],
     },
 

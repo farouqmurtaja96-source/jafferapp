@@ -1512,6 +1512,123 @@ function renderArabicLettersExtras() {
         .join("");
 }
 
+function buildArabicLettersExportHtml() {
+    const escapeHtml = (str) =>
+        String(str || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+
+    const extrasHtml = arabicLettersExtras
+        .map(
+            (item) => `
+            <div class="extra-card">
+                <div class="extra-title">${escapeHtml(item.title)}</div>
+                <div class="extra-text">${escapeHtml(item.text)}</div>
+            </div>
+        `
+        )
+        .join("");
+
+    const lettersHtml = arabicLetters
+        .map((letter) => {
+            const sunMoon = letter.sunMoon === "sun" ? "Sun" : "Moon";
+            const examples = letter.examples || {};
+            const exInitial =
+                examples.initial?.arTashkeel || examples.initial?.ar || "";
+            const exMedial =
+                examples.medial?.arTashkeel || examples.medial?.ar || "";
+            const exFinal =
+                examples.final?.arTashkeel || examples.final?.ar || "";
+            return `
+                <div class="letter-card">
+                    <div class="letter-glyph" lang="ar">${escapeHtml(letter.letter)}</div>
+                    <div class="letter-name">${escapeHtml(letter.nameEn)} (${escapeHtml(letter.nameAr)})</div>
+                    <div class="letter-meta">${escapeHtml(letter.sound)} · ${sunMoon}</div>
+                    <div class="letter-forms">
+                        <div><span>Isolated</span><strong lang="ar">${escapeHtml(letter.forms.isolated)}</strong></div>
+                        <div>
+                            <span>Initial</span>
+                            <strong lang="ar">${escapeHtml(letter.forms.initial)}</strong>
+                            <em lang="ar">${escapeHtml(exInitial)}</em>
+                        </div>
+                        <div>
+                            <span>Medial</span>
+                            <strong lang="ar">${escapeHtml(letter.forms.medial)}</strong>
+                            <em lang="ar">${escapeHtml(exMedial)}</em>
+                        </div>
+                        <div>
+                            <span>Final</span>
+                            <strong lang="ar">${escapeHtml(letter.forms.final)}</strong>
+                            <em lang="ar">${escapeHtml(exFinal)}</em>
+                        </div>
+                    </div>
+                    <div class="letter-example">
+                        <span lang="ar">${escapeHtml(letter.exampleAr)}</span>
+                        <span class="example-roman">${escapeHtml(letter.exampleArabeezy)}</span>
+                    </div>
+                    <div class="letter-note">${escapeHtml(letter.note)}</div>
+                </div>
+            `;
+        })
+        .join("");
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Arabic Letters Export</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: "IBM Plex Sans Arabic", system-ui, sans-serif; margin: 20px; color: #0f172a; direction: rtl; }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    .subtitle { font-size: 12px; color: #64748b; margin-bottom: 14px; }
+    .extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .extra-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px; }
+    .extra-title { font-weight: 700; font-size: 12px; margin-bottom: 4px; }
+    .extra-text { font-size: 11px; color: #475569; }
+    .letters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+    .letter-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+    .extra-card { break-inside: avoid; page-break-inside: avoid; }
+    .letter-glyph { font-size: 32px; font-weight: 700; text-align: center; }
+    .letter-name { text-align: center; font-weight: 600; margin-top: 4px; font-size: 13px; }
+    .letter-meta { text-align: center; font-size: 11px; color: #64748b; margin-top: 2px; }
+    .letter-forms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+    .letter-forms div { border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 6px; text-align: center; font-size: 11px; display: grid; gap: 2px; }
+    .letter-forms span { display: block; color: #64748b; font-size: 9px; }
+    .letter-forms strong { font-size: 13px; }
+    .letter-forms em { font-style: normal; font-size: 11px; color: #475569; }
+    .letter-example { margin-top: 6px; display: flex; justify-content: space-between; font-size: 11px; }
+    .example-roman { color: #64748b; }
+    .letter-note { margin-top: 6px; font-size: 10px; color: #64748b; }
+    @media print { body { margin: 10mm; } }
+  </style>
+</head>
+<body>
+  <h1>Arabic Letters</h1>
+  <div class="subtitle">Exported from Palestinian Arabic Local LMS</div>
+  <div class="extras">${extrasHtml}</div>
+  <div class="letters-grid">${lettersHtml}</div>
+</body>
+</html>`;
+}
+
+function exportArabicLettersPdf() {
+    const html = buildArabicLettersExportHtml();
+    const win = window.open("", "_blank");
+    if (!win) {
+        alert("Popup blocked – please allow popups to export PDF.");
+        return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+}
+
 function renderArabicLettersSide() {
     const side = $("#lettersSide");
     if (!side) return;
@@ -5476,6 +5593,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnLettersBackToUnits) {
         btnLettersBackToUnits.addEventListener("click", () => {
             goToLevels();
+        });
+    }
+    const btnExportArabicLettersPdf = $("#btnExportArabicLettersPdf");
+    if (btnExportArabicLettersPdf) {
+        btnExportArabicLettersPdf.addEventListener("click", () => {
+            exportArabicLettersPdf();
         });
     }
     initArabicLettersScreen();
