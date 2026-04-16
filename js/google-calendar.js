@@ -59,9 +59,6 @@ function isGoogleAuthError(error) {
 async function clearStoredGoogleCalendarConnection(reason = "Google Calendar session expired. Please reconnect.") {
     accessToken = null;
     refreshToken = null;
-    try {
-        gapi.client.setToken(null);
-    } catch {}
 
     try {
         const user = firebase.auth().currentUser;
@@ -101,19 +98,73 @@ async function testPreplyCalendarAccess() {
         const startDate = new Date();
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + 30);
-        const response = await gapi.client.calendar.events.list({
+        const response = await googleCalendarApiRequest({
             calendarId: window.preplyCalendarId,
-            timeMin: startDate.toISOString(),
-            timeMax: endDate.toISOString(),
-            singleEvents: true,
-            orderBy: 'startTime'
+            query: {
+                timeMin: startDate.toISOString(),
+                timeMax: endDate.toISOString(),
+                singleEvents: 'true',
+                orderBy: 'startTime',
+            }
         });
-        const count = response?.result?.items?.length || 0;
+        const count = response?.items?.length || 0;
         return { success: true, message: `Preply calendar is reachable. Found ${count} events in the next 30 days.`, count };
     } catch (error) {
         console.error('Error testing Preply calendar:', error);
         return { success: false, message: error?.message || 'Could not access Preply calendar' };
     }
+}
+
+async function googleCalendarApiRequest({
+    method = 'GET',
+    calendarId: targetCalendarId = calendarId,
+    path = 'events',
+    query = {},
+    body,
+}) {
+    const token = accessToken;
+    if (!token) {
+        throw new Error('Missing Google Calendar access token');
+    }
+
+    const params = new URLSearchParams();
+    Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            params.set(key, String(value));
+        }
+    });
+
+    const url = new URL(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/${path}`
+    );
+    if ([...params.keys()].length) {
+        url.search = params.toString();
+    }
+
+    const response = await fetch(url.toString(), {
+        method,
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+        let payload = null;
+        try {
+            payload = await response.json();
+        } catch {}
+        const error = new Error(payload?.error?.message || `Google Calendar API request failed (${response.status})`);
+        error.status = response.status;
+        error.result = payload;
+        throw error;
+    }
+
+    if (response.status === 204) {
+        return null;
+    }
+    return response.json();
 }
 
 function requestGoogleAccessToken(prompt = '') {
@@ -128,9 +179,8 @@ function requestGoogleAccessToken(prompt = '') {
                 return;
             }
             try {
-                const tokenResponse = gapi.client.getToken() || {};
-                accessToken = tokenResponse.access_token || resp.access_token || null;
-                refreshToken = resp.refresh_token || tokenResponse.refresh_token || refreshToken || null;
+                accessToken = resp.access_token || accessToken || null;
+                refreshToken = resp.refresh_token || refreshToken || null;
                 resolve({ accessToken, refreshToken, response: resp });
             } catch (err) {
                 reject(err);
@@ -155,10 +205,7 @@ async function ensureGoogleCalendarAccess({ interactive = false } = {}) {
     window.preplyCalendarId = normalizeCalendarId(teacher.teacherData.preplyCalendarId || teacher.teacherData.googleCalendar?.preplyCalendarId || window.preplyCalendarId);
 
     if (!interactive && accessToken) {
-        try {
-            gapi.client.setToken({ access_token: accessToken });
-            return accessToken;
-        } catch {}
+        return accessToken;
     }
 
     try {
@@ -167,7 +214,6 @@ async function ensureGoogleCalendarAccess({ interactive = false } = {}) {
         }
         const tokenResult = await requestGoogleAccessToken('consent');
         if (tokenResult?.accessToken) {
-            gapi.client.setToken({ access_token: tokenResult.accessToken });
             await firebase.firestore().collection('teachers').doc(teacher.user.uid).set({
                 googleCalendar: {
                     ...(teacher.teacherData.googleCalendar || {}),
@@ -238,12 +284,8 @@ async function initializeGoogleCalendar() {
 // Load GAPI client
 function gapiLoaded() {
     return new Promise((resolve, reject) => {
-        gapi.load('client', async () => {
+        gapi.load('client', () => {
             try {
-                await gapi.client.init({
-                    apiKey: googleCalendarConfig.apiKey,
-                    discoveryDocs: googleCalendarConfig.discoveryDocs,
-                });
                 gapiInited = true;
                 resolve();
             } catch (error) {
@@ -389,29 +431,33 @@ async function getGoogleCalendarEvents(startDate, endDate) {
         console.log("Refresh token:", refreshToken ? "Found" : "Not found");
 
         // Get events from primary calendar
-        const response = await gapi.client.calendar.events.list({
-            'calendarId': calendarId,
-            'timeMin': startDate.toISOString(),
-            'timeMax': endDate.toISOString(),
-            'singleEvents': true,
-            'orderBy': 'startTime'
+        const response = await googleCalendarApiRequest({
+            calendarId,
+            query: {
+                timeMin: startDate.toISOString(),
+                timeMax: endDate.toISOString(),
+                singleEvents: 'true',
+                orderBy: 'startTime',
+            }
         });
 
-        let allEvents = [...response.result.items];
-        console.log('Primary calendar events loaded:', response.result.items.length, 'events');
+        let allEvents = [...(response?.items || [])];
+        console.log('Primary calendar events loaded:', response?.items?.length || 0, 'events');
 
         // Get events from Preply calendar if configured
         if (window.preplyCalendarId) {
             try {
-                const preplyResponse = await gapi.client.calendar.events.list({
-                    'calendarId': window.preplyCalendarId,
-                    'timeMin': startDate.toISOString(),
-                    'timeMax': endDate.toISOString(),
-                    'singleEvents': true,
-                    'orderBy': 'startTime'
+                const preplyResponse = await googleCalendarApiRequest({
+                    calendarId: window.preplyCalendarId,
+                    query: {
+                        timeMin: startDate.toISOString(),
+                        timeMax: endDate.toISOString(),
+                        singleEvents: 'true',
+                        orderBy: 'startTime',
+                    }
                 });
-                console.log('Preply calendar events loaded:', preplyResponse.result.items.length, 'events');
-                allEvents = [...allEvents, ...preplyResponse.result.items];
+                console.log('Preply calendar events loaded:', preplyResponse?.items?.length || 0, 'events');
+                allEvents = [...allEvents, ...(preplyResponse?.items || [])];
             } catch (preplyErr) {
                 console.error('Error getting Preply calendar events:', preplyErr);
                 // Don't fail if Preply calendar fails
@@ -560,14 +606,15 @@ async function createGoogleCalendarEvent(eventData) {
 
         console.log("Creating event in Google Calendar...");
         console.log("Event data:", eventData);
-        const response = await gapi.client.calendar.events.insert({
-            'calendarId': calendarId,
-            'resource': eventData
+        const response = await googleCalendarApiRequest({
+            method: 'POST',
+            calendarId,
+            body: eventData
         });
 
-        console.log('Google Calendar event created:', response.result.id);
-        console.log('Full response:', response.result);
-        return response.result;
+        console.log('Google Calendar event created:', response.id);
+        console.log('Full response:', response);
+        return response;
     } catch (error) {
         console.error('Error creating Google Calendar event:', error);
         return null;
@@ -584,9 +631,10 @@ async function deleteGoogleCalendarEvent(eventId) {
         const token = await ensureGoogleCalendarAccess({ interactive: false });
         if (!token) return false;
 
-        await gapi.client.calendar.events.delete({
-            'calendarId': calendarId,
-            'eventId': eventId
+        await googleCalendarApiRequest({
+            method: 'DELETE',
+            calendarId,
+            path: `events/${encodeURIComponent(eventId)}`
         });
 
         return true;
