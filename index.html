@@ -10,6 +10,7 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111827'/%3E%3Ctext x='32' y='42' font-size='28' text-anchor='middle' fill='%23f8fafc' font-family='Arial, sans-serif'%3EPA%3C/text%3E%3C/svg%3E" />
     
     <!-- App scripts (order matters) -->
+    <script src="./js/config.runtime.js"></script>
     <script src="./js/config.js"></script>
     <script src="./js/google-calendar.js"></script>
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
@@ -1033,23 +1034,17 @@
         // 2. Set up authorized domains in Firebase Console
         // 3. Enable only the services you need
         // 4. Monitor API usage regularly
-        const firebaseConfig = {
-            apiKey: "AIzaSyC0haaF1Y9I-cbDfaHhSYD38COP_sMLnNI",
-            authDomain: "palestinian-arabic-lab.firebaseapp.com",
-            projectId: "palestinian-arabic-lab",
-            storageBucket: "palestinian-arabic-lab.firebasestorage.app",
-            messagingSenderId: "867160813546",
-            appId: "1:867160813546:web:fe81642287dff700ab4c93",
-            measurementId: "G-Q2GHE6545F"
-        };
-
         // 🔹 تهيئة Firebase (compat style)
-        firebase.initializeApp(firebaseConfig);
+        if (window.firebaseConfig) {
+            firebase.initializeApp(window.firebaseConfig);
 
-        // 🔹 Global handles used across the app (compat SDK)
-        // IMPORTANT: attach to window so other scripts can access reliably.
-        window.auth = firebase.auth();
-        window.db = firebase.firestore();
+            // 🔹 Global handles used across the app (compat SDK)
+            // IMPORTANT: attach to window so other scripts can access reliably.
+            window.auth = firebase.auth();
+            window.db = firebase.firestore();
+        } else {
+            console.warn("Firebase runtime config is missing. App initialization was skipped.");
+        }
     </script>
 
     <!-- App scripts (order matters) -->
