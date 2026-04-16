@@ -1,0 +1,267 @@
+export async function loadBookingStatusByEmail({
+    db,
+    email,
+    bookingStatusList,
+    bookingStatusMsg,
+    hashEmail,
+    escapeHtml,
+    formatSlotTime,
+}) {
+    if (!bookingStatusList) return;
+    bookingStatusList.innerHTML = "";
+    if (!email) {
+        if (bookingStatusMsg) bookingStatusMsg.textContent = "Please enter your email.";
+        return;
+    }
+    try {
+        const emailHash = await hashEmail(email);
+        const snap = await db.collection("publicBookings").where("emailHash", "==", emailHash).get();
+        const rows = [];
+        snap.forEach((doc) => {
+            const data = doc.data();
+            if (!data || !data.slot) return;
+            rows.push({ id: doc.id, ...data });
+        });
+        rows.sort((a, b) => (b.slot || 0) - (a.slot || 0));
+        if (!rows.length) {
+            bookingStatusList.innerHTML = "<div class=\"small-note\">No bookings found for this email.</div>";
+            return;
+        }
+        bookingStatusList.innerHTML = rows
+            .slice(0, 10)
+            .map((b) => {
+                const status = (b.status || "pending").toLowerCase();
+                const label = status === "canceled" ? "Canceled" : status === "rescheduled" ? "Rescheduled" : status === "pending" ? "Pending" : "Booked";
+                return `
+                    <div class="booking-status-item">
+                        <div><strong>${escapeHtml(formatSlotTime(b.slot))}</strong></div>
+                        <div>Status: ${escapeHtml(label)}</div>
+                    </div>
+                `;
+            })
+            .join("");
+    } catch {
+        if (bookingStatusMsg) bookingStatusMsg.textContent = "Unable to load booking status right now.";
+    }
+}
+
+export async function submitGuestBooking({
+    db,
+    bookingSettings,
+    getLocalTimezone,
+    selectedDate,
+    selectedTime,
+    formValues,
+    bookingSubmit,
+    bookingSubmitLabel,
+    bookingMsg,
+    bookingSuccessModal,
+    bookingSuccessText,
+    bookingStatusEmail,
+    findBookingConflict,
+    buildBookingSelects,
+    hashEmail,
+    sendBookingEmail,
+    createBookingViaAppsScript,
+    loadBookingStatus,
+    isLocalDevHost,
+}) {
+    const {
+        name,
+        email,
+        phone,
+        notes,
+        reasonLabels,
+        reason,
+        level,
+        lessonsPerMonth,
+        honeypot,
+        studentTimeZone,
+        studentLocale,
+        countryHint,
+        recaptchaReady,
+    } = formValues;
+
+    if (!selectedDate || !selectedTime) {
+        if (bookingMsg) bookingMsg.textContent = "Please select a date and time.";
+        return;
+    }
+
+    if (honeypot) {
+        if (bookingMsg) bookingMsg.textContent = "Please clear the hidden field.";
+        return;
+    }
+
+    const lastTs = Number(localStorage.getItem("pal_arabic_last_booking_ts") || "0");
+    if (lastTs && Date.now() - lastTs < 30000) {
+        if (bookingMsg) bookingMsg.textContent = "Please wait 30 seconds before booking again.";
+        return;
+    }
+
+    if (!name || !email || !phone) {
+        if (bookingMsg) bookingMsg.textContent = "Please fill name, email, and phone.";
+        return;
+    }
+
+    if (name.length < 2) {
+        if (bookingMsg) bookingMsg.textContent = "Please enter your full name.";
+        return;
+    }
+
+    if (!recaptchaReady) {
+        if (bookingMsg) bookingMsg.textContent = "Please complete the reCAPTCHA.";
+        return;
+    }
+
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const slotDate = new Date(selectedDate);
+    slotDate.setHours(hours, minutes, 0, 0);
+    const selectedSlot = slotDate.getTime();
+    if (!Number.isFinite(selectedSlot) || selectedSlot <= Date.now() + (30 * 60 * 1000)) {
+        if (bookingMsg) bookingMsg.textContent = "Please choose a future time at least 30 minutes from now.";
+        return;
+    }
+
+    try {
+        if (bookingSubmit) {
+            bookingSubmit.disabled = true;
+            bookingSubmit.classList.add("is-loading");
+        }
+        if (bookingSubmitLabel) bookingSubmitLabel.textContent = "Booking...";
+        if (bookingMsg) bookingMsg.textContent = "Booking your lesson...";
+
+        const slot = slotDate.toLocaleString();
+        const conflict = await findBookingConflict(selectedSlot);
+        if (conflict) {
+            if (bookingMsg) bookingMsg.textContent = "That time was just taken. Please choose another slot.";
+            await buildBookingSelects();
+            return;
+        }
+
+        const tzLabel = bookingSettings.timezone || getLocalTimezone() || "Local time";
+        const combinedNotes = [
+            notes,
+            reason ? `Reasons: ${reason}` : "",
+            level ? `Level: ${level}` : "",
+            lessonsPerMonth ? `Lessons per month: ${lessonsPerMonth}` : "",
+            `Timezone: ${tzLabel}`,
+            studentTimeZone ? `Student timezone: ${studentTimeZone}` : "",
+            studentLocale ? `Student locale: ${studentLocale}` : "",
+        ].filter(Boolean).join("\n");
+
+        const bookingRef = db.collection("bookings").doc();
+        let calendarSynced = false;
+        let googleCalendarEventId = null;
+        const appsScriptSync = await createBookingViaAppsScript?.({
+            bookingId: bookingRef.id,
+            slot: selectedSlot,
+            durationMinutes: bookingSettings.slotMinutes || 50,
+            timeZone: bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
+            name,
+            email,
+            phone,
+            notes: combinedNotes,
+            studentTimeZone,
+            studentLocale,
+        });
+        if (appsScriptSync?.success) {
+            calendarSynced = true;
+            googleCalendarEventId = appsScriptSync.eventId || null;
+        }
+
+        await bookingRef.set({
+            name,
+            email,
+            phone,
+            notes: combinedNotes,
+            source: "guest",
+            reason,
+            reasonLabels,
+            level,
+            lessonsPerMonth,
+            studentTimeZone,
+            studentLocale,
+            countryHint,
+            slot: selectedSlot,
+            status: "booked",
+            calendarSynced,
+            googleCalendarEventId,
+            timezone: bookingSettings.timezone || getLocalTimezone(),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            history: [
+                {
+                    at: Date.now(),
+                    action: "created",
+                    by: "student",
+                },
+            ],
+        });
+
+        const emailHash = await hashEmail(email);
+        await db.collection("publicBookings").doc(bookingRef.id).set({
+            slot: selectedSlot,
+            status: "booked",
+            emailHash,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            calendarSynced,
+            source: "guest",
+        });
+
+        const emailSummary = [
+            `Student: ${name}`,
+            `Email: ${email}`,
+            `Phone: ${phone}`,
+            reason ? `Reasons: ${reason}` : "",
+            level ? `Level: ${level}` : "",
+            lessonsPerMonth ? `Lessons/month: ${lessonsPerMonth}` : "",
+            `Student timezone: ${studentTimeZone || "-"}`,
+            `Student locale: ${studentLocale || "-"}`,
+            `Country hint: ${countryHint || "-"}`,
+            `Teacher timezone: ${bookingSettings.timezone || getLocalTimezone() || "-"}`,
+            `Selected time: ${slot}`,
+            notes ? `Notes: ${notes}` : "",
+        ].filter(Boolean).join("\n");
+
+        sendBookingEmail({
+            name,
+            email,
+            phone,
+            notes: combinedNotes,
+            slot,
+            studentTimeZone,
+            studentLocale,
+            teacherTimeZone: bookingSettings.timezone || getLocalTimezone() || "",
+            reasons: reason,
+            level,
+            lessonsPerMonth,
+            countryHint,
+            summary: emailSummary,
+        }).catch((err) => {
+            console.error("Error sending booking email:", err);
+        });
+
+        if (bookingMsg) bookingMsg.textContent = "Booked! You will receive a confirmation email.";
+        if (bookingSuccessModal && bookingSuccessText) {
+            const tz = bookingSettings.timezone || getLocalTimezone() || "Local time";
+            bookingSuccessText.textContent = `Your lesson is confirmed for ${slot}. Timezone: ${tz}.`;
+            bookingSuccessModal.classList.add("modal--open");
+        }
+        localStorage.setItem("pal_arabic_last_booking_ts", String(Date.now()));
+        localStorage.setItem("pal_arabic_last_booking_email", email);
+        if (bookingStatusEmail) bookingStatusEmail.value = email;
+        await loadBookingStatus(email);
+        if (!isLocalDevHost() && window.grecaptcha && typeof window.grecaptcha.reset === "function") {
+            window.grecaptcha.reset();
+        }
+        await buildBookingSelects();
+    } catch (err) {
+        console.error("Booking failed with error:", err);
+        if (bookingMsg) bookingMsg.textContent = "Booking failed. Please try again.";
+    } finally {
+        if (bookingSubmit) bookingSubmit.classList.remove("is-loading");
+        if (bookingSubmitLabel) bookingSubmitLabel.textContent = "Book Now";
+        if (bookingSubmit && window.selectedDate && window.selectedTime) bookingSubmit.disabled = false;
+    }
+}

@@ -1,11 +1,21 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8" />
     <title>Palestinian Arabic – Local LMS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; script-src-elem 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://firestore.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://content.googleapis.com https://script.google.com https://script.googleusercontent.com; frame-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://palestinian-arabic-lab.firebaseapp.com; child-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://palestinian-arabic-lab.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111827'/%3E%3Ctext x='32' y='42' font-size='28' text-anchor='middle' fill='%23f8fafc' font-family='Arial, sans-serif'%3EPA%3C/text%3E%3C/svg%3E" />
+    
+    <!-- App scripts (order matters) -->
+    <script src="./js/config.js"></script>
+    <script src="./js/google-calendar.js"></script>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script src="https://apis.google.com/js/api.js" onload="window.handleClientLoad && window.handleClientLoad()" onerror="console.error('Error loading GAPI')"></script>
+    <script src="https://accounts.google.com/gsi/client" onload="window.handleGisLoad && window.handleGisLoad()" async defer></script>
+
 </head>
 
 <body>
@@ -56,6 +66,46 @@
         </div>
     </div>
 
+    <!-- Modal للاشتراك -->
+    <div id="subscribeModal" class="modal">
+        <div class="modal__backdrop" data-close-subscribe></div>
+        <div class="modal__body modal__body--wide">
+            <button class="modal__close" data-close-subscribe>&times;</button>
+            <h3 style="margin-bottom:16px; text-align:center;">اختر نوع الإشتراك</h3>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-top:20px;">
+                <!-- خيار 1: Full Site Access -->
+                <div class="subscribe-option-card">
+                    <div style="font-size:48px; margin-bottom:12px;">🌐</div>
+                    <h4 style="margin-bottom:8px;">Full Site Access</h4>
+                    <p style="font-size:0.9rem; color:#666; margin-bottom:16px;">
+                        Get full access to all units and practice exercises.
+                    </p>
+                    <p class="small-note" id="subscribeSitePriceWrap" style="display:none; margin-bottom:16px;">
+                        Price: <strong id="subscribeSitePrice">–</strong>
+                    </p>
+                    <button id="subscribeWhatsAppBtn" class="btn btn--primary btn--sm" style="width:100%;">
+                        📱 Contact on WhatsApp
+                    </button>
+                </div>
+
+                <!-- خيار 2: Trial Lesson -->
+                <div class="subscribe-option-card">
+                    <div style="font-size:48px; margin-bottom:12px;">📚</div>
+                    <h4 style="margin-bottom:8px;">Book a Trial Lesson</h4>
+                    <p style="font-size:0.9rem; color:#666; margin-bottom:16px;">
+                        Book a free trial lesson to experience our teaching method.
+                    </p>
+                    <p style="font-size:0.85rem; color:#888; margin-bottom:16px;">
+                        Trial lesson length: <strong>50 minutes</strong>
+                    </p>
+                    <button id="subscribeBookingBtn" class="btn btn--outline btn--sm" style="width:100%;">
+                        📅 Book Trial Lesson
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ============== HOME SCREEN ============== -->
     <section id="home-screen" class="screen screen--active screen--full-hero">
         <div class="hero hero--full">
@@ -72,6 +122,9 @@
                     </button>
                     <button id="btnHeroGuest" class="btn btn--primary btn--lg btn--guest">
                         Continue as Guest
+                    </button>
+                    <button id="btnHeroSubscribe" class="btn btn--outline btn--lg">
+                        Subscribe
                     </button>
 
                 </div>
@@ -164,13 +217,12 @@
                         Use one device in class and let students re-use their profile every session.
                         You can check their homework notes and progress per section.
                     </p>
-                    <p style="margin-top: 6px;">
+            <p style="margin-top: 6px;">
                         Need to adjust lessons or add new ones?
                         Go to the <strong>Teacher Dashboard</strong> from the top bar.
                     </p>
                 </div>
             </div>
-            </aside>
             <section class="td-main">
                 <div id="teacherEditor" class="lesson-content td-editor" style="margin-top: 0; display: none;"></div>
                 <div id="addUnitCard" class="card add-unit-card td-addunit">
@@ -212,6 +264,8 @@
                     <button id="btnSwitchProfile" class="btn btn--ghost">Switch Profile</button>
                     <button id="btnContinueLesson" class="btn btn--primary btn--sm">Continue</button>
                     <button id="btnArabicLetters" class="btn btn--outline btn--sm">Arabic Letters</button>
+                    <button id="btnSubscribe" class="btn btn--outline btn--sm">Subscribe</button>
+                    <button id="btnContact" class="btn btn--ghost btn--sm">Contact</button>
                     <button id="btnSyncLessonsNow" class="btn btn--ghost">↻ Sync lessons</button>
                     <button id="btnGoTeacherDashboard" class="btn btn--outline">Teacher Dashboard</button>
                 </div>
@@ -467,6 +521,149 @@
                 <p id="createStudentMsg" style="font-size:0.8rem; margin-top:4px;"></p>
             </section>
 
+            <section class="teacher-editor__section">
+                <h4>Contact Settings (Guest Upgrade)</h4>
+                <p class="teacher-edit-note">
+                    Set the WhatsApp link or number used for subscriptions and trial lessons.
+                </p>
+                <div class="form-field">
+                    <label>WhatsApp Link or Number</label>
+                    <input type="text" id="contactWhatsApp" placeholder="+9705xxxxxxx or https://wa.me/..." />
+                </div>
+                <div class="form-field">
+                    <label>Full Site Access Price (Optional)</label>
+                    <input type="text" id="contactSitePrice" placeholder="e.g. 49" />
+                </div>
+                <button id="btnSaveContact" class="btn btn--primary btn--sm">Save Contact</button>
+                <p id="contactSaveMsg" style="font-size:0.8rem; margin-top:4px;"></p>
+            </section>
+
+            <section class="teacher-editor__section">
+                <h4>Booking Availability</h4>
+                <p class="teacher-edit-note">
+                    Set your weekly availability. Students will only see these times.
+                </p>
+                <div class="form-field">
+                    <label>Timezone (for availability)</label>
+                    <select id="availTimezone">
+                        <option value="">Auto-detect</option>
+                        <option value="Africa/Cairo">Africa/Cairo</option>
+                        <option value="Asia/Jerusalem">Asia/Jerusalem</option>
+                        <option value="Europe/London">Europe/London</option>
+                        <option value="Europe/Berlin">Europe/Berlin</option>
+                        <option value="America/New_York">America/New_York</option>
+                        <option value="America/Chicago">America/Chicago</option>
+                        <option value="America/Los_Angeles">America/Los_Angeles</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>Session length (minutes)</label>
+                    <input type="number" id="availSlotMinutes" value="50" min="30" max="120" />
+                </div>
+                <div class="form-field">
+                    <label>Break between sessions (minutes)</label>
+                    <input type="number" id="availBreakMinutes" value="10" min="0" max="30" />
+                </div>
+                <div id="availabilityGrid" class="availability-grid"></div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="btnSaveAvailability" class="btn btn--primary btn--sm">Save Availability</button>
+                    <button id="btnResetAvailability" class="btn btn--outline btn--sm">Reset Availability</button>
+                </div>
+                <p id="availabilitySaveMsg" style="font-size:0.8rem; margin-top:4px;"></p>
+            </section>
+
+            <section class="teacher-editor__section">
+                <h4>Busy Blocks (Specific Dates)</h4>
+                <p class="teacher-edit-note">
+                    Add one-off busy times for a specific date (appointments, meetings, etc.).
+                </p>
+                <div class="availability-exception">
+                    <div class="form-field form-field--inline">
+                        <label>Date</label>
+                        <input type="date" id="exceptionDate" />
+                    </div>
+                    <div class="form-field form-field--inline">
+                        <label>Start</label>
+                        <input type="time" id="exceptionStart" />
+                    </div>
+                    <div class="form-field form-field--inline">
+                        <label>End</label>
+                        <input type="time" id="exceptionEnd" />
+                    </div>
+                    <div class="form-field form-field--inline">
+                        <label>Note (optional)</label>
+                        <input type="text" id="exceptionNote" placeholder="Meeting, travel, etc." />
+                    </div>
+                    <button id="btnAddException" class="btn btn--outline btn--sm">Add Busy Block</button>
+                </div>
+                <div id="exceptionsList" class="exceptions-list"></div>
+                <p id="exceptionsMsg" style="font-size:0.8rem; margin-top:4px;"></p>
+            </section>
+
+            <section class="teacher-editor__section">
+                <h4>Apps Script Backend</h4>
+                <p class="teacher-edit-note">
+                    Preferred stable sync. Use a Google Apps Script Web App to import busy times and create Google Calendar events even when the teacher page is closed.
+                </p>
+                <div class="form-field">
+                    <label>Apps Script Web App URL</label>
+                    <input type="text" id="appsScriptWebAppUrl" placeholder="Paste your deployed Apps Script Web App URL" />
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="btnSaveAppsScriptUrl" class="btn btn--primary btn--sm">Save Apps Script URL</button>
+                    <button id="btnTestAppsScript" class="btn btn--outline btn--sm">Test Apps Script</button>
+                    <button id="btnImportBusyAppsScript" class="btn btn--ghost btn--sm">Import Busy via Apps Script</button>
+                </div>
+                <p id="appsScriptMsg" style="font-size:0.8rem; margin-top:4px;"></p>
+            </section>
+
+            <section class="teacher-editor__section">
+                <h4>Google Calendar Sync</h4>
+                <p class="teacher-edit-note">
+                    Legacy browser-based Google sync. Keep this as a fallback. Apps Script above is the recommended path.
+                </p>
+                <div id="googleCalendarStatus" class="google-calendar-status">
+                    <div class="status-indicator" id="calendarStatusIndicator"></div>
+                    <span id="calendarStatusText">Not connected</span>
+                </div>
+                <div class="calendar-buttons">
+                    <button id="btnConnectGoogleCalendar" class="btn btn--primary btn--sm">
+                        🔗 Connect Google Calendar
+                    </button>
+                    <button id="btnDisconnectGoogleCalendar" class="btn btn--outline btn--sm" style="display:none;">
+                        ✖ Disconnect
+                    </button>
+                    <button id="btnImportGoogleCalendar" class="btn btn--outline btn--sm">
+                        ⤓ Import Busy Times
+                    </button>
+                    <button id="btnSyncBookingsNow" class="btn btn--outline btn--sm">
+                        ↻ Sync Bookings Now
+                    </button>
+                </div>
+                <div class="form-field" style="margin-top:12px;">
+                    <label>Preply Calendar ID (optional)</label>
+                    <input type="text" id="preplyCalendarIdInput" placeholder="Paste your Preply Google calendar ID" />
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="btnSavePreplyCalendarId" class="btn btn--outline btn--sm">Save Preply Calendar ID</button>
+                    <button id="btnTestPreplyCalendar" class="btn btn--ghost btn--sm">Test Preply Calendar</button>
+                </div>
+                <p id="googleCalendarMsg" style="font-size:0.8rem; margin-top:4px;"></p>
+            </section>
+
+            <section class="teacher-editor__section">
+                <h4>Bookings</h4>
+                <p class="teacher-edit-note">
+                    Review, cancel, or reschedule upcoming bookings.
+                </p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                    <button id="btnClearAllBookings" class="btn btn--outline btn--sm">Clear All Bookings</button>
+                    <button id="btnClearBusyBlocks" class="btn btn--ghost btn--sm">Clear Busy Blocks</button>
+                </div>
+                <div id="teacherBookingList" class="booking-panel"></div>
+                <p id="teacherBookingMsg" style="font-size:0.8rem; margin-top:4px;"></p>
+            </section>
+
             <div class="td-layout">
                 <aside class="td-sidebar">
                     <div class="td-sidebar__head">
@@ -608,6 +805,19 @@
         </div>
     </div>
 
+    <!-- =================== BOOKING SUCCESS MODAL =================== -->
+    <div id="bookingSuccessModal" class="modal">
+        <div class="modal__backdrop" data-close-booking-success></div>
+        <div class="modal__body">
+            <button class="modal__close" data-close-booking-success>&times;</button>
+            <h3 style="margin-bottom:8px;">Booking Confirmed</h3>
+            <p id="bookingSuccessText" class="small-note"></p>
+            <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+                <button class="btn btn--primary btn--sm" data-close-booking-success>Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- =================== MICRO-CHECK MODAL =================== -->
     <div id="microCheckModal" class="modal">
         <div class="modal__backdrop"></div>
@@ -688,13 +898,141 @@
         </div>
     </div>
 
+                <!-- ============== SUBSCRIBE SCREEN ============== -->
+    <section id="subscribe-screen" class="screen screen--full">
+        <div class="section-header section-header--with-actions">
+            <div>
+                <h2>Book Your Lesson</h2>
+                <p class="section-header__subtitle">
+                    Choose your preferred date and time for your trial lesson (50 minutes).
+                </p>
+            </div>
+            <div class="section-header__actions">
+                <button id="btnBackToUnitsFromSubscribe" class="btn btn--ghost btn--sm">Back to Units</button>
+            </div>
+        </div>
+
+        <div class="subscribe-layout">
+            <div class="subscribe-panel">
+                <div class="subscribe-card">
+                    <h4>Available Times</h4>
+                    <p class="small-note">Choose a day, then click one available time. Times are shown in your device timezone.</p>
+                    <div class="booking-selects booking-selects--calendar">
+                        <div class="booking-calendar-topbar">
+                            <div class="form-field">
+                                <label>Timezone</label>
+                                <div class="small-note" id="bookingTimezoneLabel">Auto</div>
+                            </div>
+                            <div class="booking-week-nav">
+                                <button type="button" class="btn btn--ghost btn--sm" id="bookingWeekPrev">Previous</button>
+                                <div class="small-note" id="bookingWeekLabel">This week</div>
+                                <button type="button" class="btn btn--ghost btn--sm" id="bookingWeekNext">Next</button>
+                            </div>
+                        </div>
+                        <div class="booking-date-chips" id="bookingDateChips"></div>
+                        <div id="bookingWeeklyGrid" class="booking-weekly-grid"></div>
+                        <div id="bookingEmptyState" class="small-note" style="display:none;">No available times in this week.</div>
+                    </div>
+                    <div class="booking-info" id="bookingInfo" style="display:none;">
+                        <p class="small-note">Selected time: <strong id="selectedTimeDisplay"></strong></p>
+                        <p class="small-note">Duration: <strong>50 minutes</strong></p>
+                    </div>
+                </div>
+                <div class="subscribe-card">
+                    <h4>Your Details</h4>
+                    <p class="small-note">Only name, email, and phone are required. The rest is optional.</p>
+                    <form id="bookingForm" class="upgrade-form">
+                        <input type="hidden" id="bookingWebsite" autocomplete="off" />
+                        <div class="form-field">
+                            <label>Full Name *</label>
+                            <input type="text" id="bookingName" required placeholder="Enter your full name" />
+                        </div>
+                        <div class="form-field">
+                            <label>Email Address *</label>
+                            <input type="email" id="bookingEmail" required placeholder="Enter your email" />
+                        </div>
+                        <div class="form-field">
+                            <label>Mobile / WhatsApp *</label>
+                            <input type="text" id="bookingPhone" required placeholder="Enter your phone number" />
+                        </div>
+                        <div class="form-field">
+                            <label>Why do you want to learn Arabic?</label>
+                            <div id="bookingReasonGroup" class="goal-options">
+                                <label class="goal-chip"><input type="checkbox" value="travel" /> For Travel</label>
+                                <label class="goal-chip"><input type="checkbox" value="study" /> For Study</label>
+                                <label class="goal-chip"><input type="checkbox" value="work" /> For Work</label>
+                                <label class="goal-chip"><input type="checkbox" value="family" /> Family Communication</label>
+                                <label class="goal-chip"><input type="checkbox" value="fun" /> For Fun</label>
+                                <label class="goal-chip"><input type="checkbox" value="other" /> Other</label>
+                            </div>
+                        </div>
+                        <div class="form-field">
+                            <label>What is your current Arabic level?</label>
+                            <select id="bookingLevel">
+                                <option value="">Select level</option>
+                                <option value="beginner">Beginner</option>
+                                <option value="pre-intermediate">Pre-Intermediate</option>
+                                <option value="intermediate">Intermediate</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label>How many lessons per month?</label>
+                            <select id="bookingLessonsPerMonth">
+                                <option value="">Select number</option>
+                                <option value="4">4 lessons</option>
+                                <option value="8">8 lessons</option>
+                                <option value="12">12 lessons</option>
+                                <option value="16">16 lessons</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label>Notes (optional)</label>
+                            <input type="text" id="bookingNotes" placeholder="Any additional information" />
+                        </div>
+                        <div class="form-field">
+                            <div class="g-recaptcha" data-sitekey="6LcLRrcsAAAAALQlPoVFVTbOuGPoqvKaCiniUMfV"></div>
+                        </div>
+                        <button type="submit" class="btn btn--primary btn--sm" id="bookingSubmit" disabled>
+                            <span class="btn__label">Book Now</span>
+                            <span class="btn__spinner" aria-hidden="true"></span>
+                        </button>
+                        <p id="bookingMsg" style="font-size:0.85rem; margin-top:6px;"></p>
+                    </form>
+                    <div class="subscribe-card booking-status-card">
+                        <h4>Your Booking Status</h4>
+                        <p class="small-note">Enter your email to view booked, pending, or canceled lessons.</p>
+                        <div class="form-field">
+                            <label>Email</label>
+                            <input type="email" id="bookingStatusEmail" placeholder="Enter your email" />
+                        </div>
+                        <button id="bookingStatusBtn" class="btn btn--outline btn--sm">Check Status</button>
+                        <div id="bookingStatusList" class="booking-status-list"></div>
+                        <p id="bookingStatusMsg" style="font-size:0.85rem; margin-top:6px;"></p>
+                    </div>
+                    <div class="upgrade-actions" style="margin-top:8px;">
+                        <button id="trialContactBtn" class="btn btn--ghost btn--sm">Contact on WhatsApp</button>
+                    </div>
+                    <p class="small-note" style="margin-top:8px;">You will receive a confirmation email after booking.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Firebase compat SDKs (v9) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+
 
     <script>
         // 🔹 Firebase config تبع مشروعك (نفس اللي جبتيه من الكونسول)
+        // SECURITY NOTE: 
+        // 1. Restrict this API key in Firebase Console to your domain only
+        // 2. Set up authorized domains in Firebase Console
+        // 3. Enable only the services you need
+        // 4. Monitor API usage regularly
         const firebaseConfig = {
             apiKey: "AIzaSyC0haaF1Y9I-cbDfaHhSYD38COP_sMLnNI",
             authDomain: "palestinian-arabic-lab.firebaseapp.com",
@@ -722,3 +1060,6 @@
 </body>
 
 </html>
+
+
+

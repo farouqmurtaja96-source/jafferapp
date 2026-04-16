@@ -5,6 +5,63 @@ import * as CONST from '../core/constants.js';
 import { defaultLessons as importedDefaultLessons } from '../lessons/index.js';
 import * as Cloud from '../cloud/lessonsCloud.js';
 import { arabicLetters, arabicLettersExtras, arabicLettersExercises } from '../data/arabicLettersData.js';
+import {
+    createInitialContactSettings,
+    loadContactSettings as loadStoredContactSettings,
+    saveContactSettings as saveStoredContactSettings,
+    buildWhatsAppUrl as buildWhatsAppUrlFromSettings,
+} from './contactSettingsStore.js';
+import {
+    createInitialBookingSettings,
+    getDefaultBookingSettings as createDefaultBookingSettings,
+    ensureBookingSettingsShape as normalizeBookingSettings,
+    loadBookingSettings as loadStoredBookingSettings,
+    saveBookingSettings as saveStoredBookingSettings,
+    loadBookingSettingsFromCloud as loadBookingSettingsStateFromCloud,
+    saveBookingSettingsToCloud as saveBookingSettingsStateToCloud,
+} from './bookingSettingsStore.js';
+import {
+    canUseTeacherRole,
+    ensureTeacherDoc as ensureTeacherDocRecord,
+    ensureTeacherUserDoc as ensureTeacherUserRecord,
+} from './teacherAccess.js';
+import {
+    resolveUserRole,
+    bootstrapTeacherAccess,
+    createStudentAccount,
+} from './authFlows.js';
+import {
+    renderTeacherBookings as renderTeacherBookingsView,
+    openReschedulePanel,
+    cancelBooking as cancelTeacherBooking,
+    rescheduleBooking as rescheduleTeacherBooking,
+    clearAllBookings as clearAllTeacherBookings,
+} from './teacherBookingAdmin.js';
+import {
+    loadBookingStatusByEmail,
+    submitGuestBooking,
+} from './guestBookingFlow.js';
+import {
+    wireDialogueEditor,
+    wireGrammarEditor,
+    wireTranslationEditor,
+    wireQuizEditor,
+    wireRolePlayEditor,
+    wireHomeworkEditor,
+    wireTeacherNotesEditor,
+} from './teacherPracticeEditor.js';
+import {
+    toMinutes as bookingToMinutes,
+    addDaysToDateKey as bookingAddDaysToDateKey,
+    getZonedParts as bookingGetZonedParts,
+    zonedDateTimeToUtcMs as bookingZonedDateTimeToUtcMs,
+    isSlotBlockedByException as bookingIsSlotBlockedByException,
+    getBookedSlotsMap as bookingGetBookedSlotsMap,
+    doesSlotOverlap as bookingDoesSlotOverlap,
+    findBookingConflict as bookingFindBookingConflict,
+    getAvailableSlots as bookingGetAvailableSlots,
+    getSchedulableSlots as bookingGetSchedulableSlots,
+} from './bookingAvailability.js';
 
 // Re-create original constant names in module scope
 const LS_STUDENTS_KEY = CONST.LS_STUDENTS_KEY;
@@ -14,6 +71,8 @@ const LS_CUSTOM_UNITS_KEY = CONST.LS_CUSTOM_UNITS_KEY;
 const LS_BACKUP_SETTINGS_KEY = CONST.LS_BACKUP_SETTINGS_KEY;
 const LS_WHITEBOARD_PREFIX = CONST.LS_WHITEBOARD_PREFIX;
 const LS_USER_ROLE_KEY = CONST.LS_USER_ROLE_KEY;
+const LS_CONTACT_SETTINGS_KEY = CONST.LS_CONTACT_SETTINGS_KEY;
+const LS_BOOKING_SETTINGS_KEY = CONST.LS_BOOKING_SETTINGS_KEY;
 const LESSON_ID_GREETING = CONST.LESSON_ID_GREETING;
 const LESSON_ID_DAILY_ROUTINE = CONST.LESSON_ID_DAILY_ROUTINE;
 const LESSON_ID_FOOD_DRINK = CONST.LESSON_ID_FOOD_DRINK;
@@ -75,6 +134,253 @@ let backupSettings = {
     frequency: "off",      // "off" | "daily" | "2d" | "weekly"
     lastBackupAt: null,    // ISO string
 };
+
+let contactSettings = createInitialContactSettings();
+let runtimeBusyBlocks = [];
+let bookingSettings = createInitialBookingSettings();
+
+function getDefaultBookingSettings() {
+    return createDefaultBookingSettings(bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo");
+}
+
+function ensureBookingSettingsShape() {
+    bookingSettings = normalizeBookingSettings(bookingSettings);
+}
+
+function loadBookingSettings() {
+    bookingSettings = loadStoredBookingSettings(LS_BOOKING_SETTINGS_KEY, bookingSettings);
+    return bookingSettings;
+}
+
+function saveBookingSettings() {
+    saveStoredBookingSettings(LS_BOOKING_SETTINGS_KEY, bookingSettings);
+}
+
+async function loadBookingSettingsFromCloud() {
+    bookingSettings = await loadBookingSettingsStateFromCloud(db, bookingSettings);
+}
+
+async function saveBookingSettingsToCloud() {
+    await saveBookingSettingsStateToCloud(db, bookingSettings);
+}
+
+function loadContactSettings() {
+    contactSettings = loadStoredContactSettings(LS_CONTACT_SETTINGS_KEY, contactSettings);
+    return contactSettings;
+}
+
+function saveContactSettings() {
+    saveStoredContactSettings(LS_CONTACT_SETTINGS_KEY, contactSettings);
+}
+
+async function ensureTeacherDoc(uid, email) {
+    return ensureTeacherDocRecord({ db, firebase, uid, email });
+}
+
+async function ensureTeacherUserDoc(uid, email) {
+    return ensureTeacherUserRecord({ db, firebase, uid, email });
+}
+
+
+function buildWhatsAppUrl(message) {
+    return buildWhatsAppUrlFromSettings(contactSettings, message);
+}
+
+function openWhatsAppWithMessage(message) {
+    const url = buildWhatsAppUrl(message);
+    if (!url) {
+        toast("WhatsApp contact not set.");
+        return;
+    }
+    window.open(url, "_blank");
+}
+
+function ensureEmailJsInit() {
+    try {
+        if (window.emailjs && typeof window.emailjs.init === "function") {
+            window.emailjs.init("N5rGMrRJY7IbqGsuJ");
+        }
+    } catch { }
+}
+
+async function sendBookingEmail(payload) {
+    try {
+        if (!window.emailjs || typeof window.emailjs.send !== "function") return;
+        const params = {
+            to_email: "farouqmurtaja96@gmail.com",
+            student_name: payload.name,
+            student_email: payload.email,
+            student_phone: payload.phone,
+            slot_time: payload.slot,
+            notes: payload.notes || "",
+            student_timezone: payload.studentTimeZone || "",
+            student_locale: payload.studentLocale || "",
+            teacher_timezone: payload.teacherTimeZone || "",
+            booking_reasons: payload.reasons || "",
+            booking_level: payload.level || "",
+            booking_lessons_per_month: payload.lessonsPerMonth || "",
+            booking_country_hint: payload.countryHint || "",
+            booking_summary: payload.summary || "",
+        };
+        await window.emailjs.send("service_977rmzv", "template_419nlgt", params);
+        console.log("Booking email sent successfully");
+    } catch (err) {
+        console.error("Error sending booking email:", err);
+        // Don't throw - email failure shouldn't block booking
+    }
+}
+
+function getLocalTimezone() {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    } catch {
+        return "";
+    }
+}
+
+function formatSlotTime(ts) {
+    try {
+        return new Date(ts).toLocaleString();
+    } catch {
+        return String(ts);
+    }
+}
+
+function getDateKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
+function toMinutes(timeStr) {
+    return bookingToMinutes(timeStr);
+}
+
+function addDaysToDateKey(dateKey, days) {
+    return bookingAddDaysToDateKey(dateKey, days);
+}
+
+function getZonedParts(date, timeZone) {
+    return bookingGetZonedParts(date, timeZone);
+}
+
+function getTimeZoneOffsetMs(timeZone, date) {
+    const parts = getZonedParts(date, timeZone);
+    const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second || 0);
+    return asUtc - date.getTime();
+}
+
+function zonedDateTimeToUtcMs(timeZone, year, month, day, hour, minute) {
+    return bookingZonedDateTimeToUtcMs(timeZone, year, month, day, hour, minute);
+}
+
+function normalizePhone(input) {
+    const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
+    let s = (input || "").toString();
+    s = s
+        .split("")
+        .map((ch) => {
+            const idx = arabicDigits.indexOf(ch);
+            return idx >= 0 ? String(idx) : ch;
+        })
+        .join("");
+    return s.replace(/[^\d+]/g, "");
+}
+
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "");
+}
+
+function isValidPhone(phone) {
+    const digits = (phone || "").replace(/\D/g, "");
+    return digits.length >= 7 && digits.length <= 15;
+}
+
+function escapeHtml(str) {
+    return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function escapeAttr(str) {
+    return escapeHtml(str).replace(/`/g, "&#96;");
+}
+
+function isLocalDevHost() {
+    try {
+        const host = window.location.hostname || "";
+        return host === "localhost" || host === "127.0.0.1";
+    } catch {
+        return false;
+    }
+}
+
+function getBookingReasonLabels() {
+    const labels = {
+        travel: "For Travel",
+        study: "For Study",
+        work: "For Work",
+        family: "Family Communication",
+        fun: "For Fun",
+        other: "Other",
+    };
+    return Array.from(document.querySelectorAll("#bookingReasonGroup input:checked"))
+        .map((input) => labels[input.value] || input.value)
+        .filter(Boolean);
+}
+
+async function hashEmail(email) {
+    const normalized = (email || "").trim().toLowerCase();
+    const encoder = new TextEncoder();
+    const data = encoder.encode(normalized);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function isSlotBlockedByException(slotStartMs, slotMinutes) {
+    return bookingIsSlotBlockedByException(slotStartMs, slotMinutes, {
+        bookingSettings,
+        runtimeBusyBlocks,
+        getLocalTimezone,
+    });
+}
+
+async function getBookedSlotsMap(startMs, endMs) {
+    return bookingGetBookedSlotsMap(startMs, endMs, { db, bookingSettings });
+}
+
+function doesSlotOverlap(slotStartMs, slotMinutes, bookedMap, excludeBookingId = null) {
+    return bookingDoesSlotOverlap(slotStartMs, slotMinutes, bookedMap, excludeBookingId);
+}
+
+async function findBookingConflict(slotStartMs, { excludeBookingId = null } = {}) {
+    return bookingFindBookingConflict(slotStartMs, { db, bookingSettings }, { excludeBookingId });
+}
+
+async function getAvailableSlots(daysToShow = 14, options = {}) {
+    return bookingGetAvailableSlots(daysToShow, {
+        db,
+        bookingSettings,
+        runtimeBusyBlocks,
+        getLocalTimezone,
+        getDateKey,
+    }, options);
+}
+
+async function getSchedulableSlots(daysToShow = 14, options = {}) {
+    return bookingGetSchedulableSlots(daysToShow, {
+        db,
+        bookingSettings,
+        runtimeBusyBlocks,
+        getLocalTimezone,
+        getDateKey,
+    }, options);
+}
 
 const exportContext = {
     lessonId: null,
@@ -178,15 +484,13 @@ auth.onAuthStateChanged(async (user) => {
     if (!user) {
         appState.currentUser = null;
         updateAuthUI();
+        try { window.refreshGoogleCalendarStatus?.(); } catch { }
         // رجّعيه للصفحة الرئيسية
         showScreen("home-screen");
         return;
     }
 
     try {
-        const snap = await db.collection("users").doc(user.uid).get();
-        const data = snap.data() || {};
-
         // نحاول نقرأ الدور من Firestore، ولو مش موجود من localStorage
         let savedRole = null;
         try {
@@ -195,7 +499,13 @@ auth.onAuthStateChanged(async (user) => {
             console.warn("Could not read role from localStorage", e);
         }
 
-        const role = data.role || savedRole || "student";
+        const { role } = await resolveUserRole({
+            db,
+            uid: user.uid,
+            email: user.email,
+            savedRole,
+            fallbackRole: null,
+        });
 
         appState.currentUser = {
             uid: user.uid,
@@ -210,9 +520,11 @@ auth.onAuthStateChanged(async (user) => {
             console.warn("Could not save role to localStorage", e);
         }
 
+        try { window.refreshGoogleCalendarStatus?.(); } catch { }
         updateAuthUI();
 
         if (role === "teacher") {
+            await bootstrapTeacherAccess({ db, firebase, uid: user.uid, email: user.email });
             await syncTeacherStudentsFromCloud?.();
             renderStudents();
             renderTeacherPicker();
@@ -1539,14 +1851,6 @@ function renderArabicLettersExtras() {
 }
 
 function buildArabicLettersExportHtml() {
-    const escapeHtml = (str) =>
-        String(str || "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#39;");
-
     const extrasHtml = arabicLettersExtras
         .map(
             (item) => `
@@ -2122,6 +2426,7 @@ function saveStudentsToLS({ skipCloud = false } = {}) {
 
 async function syncTeacherStudentsFromCloud() {
     if (!appState.currentUser || appState.currentUser.role !== "teacher") return;
+    try {
 
     const ref = db.collection("teacherStudents");
     const snap = await ref.where("teacherId", "==", appState.currentUser.uid).get();
@@ -2142,6 +2447,10 @@ async function syncTeacherStudentsFromCloud() {
 
     appState.students = loaded;
     saveStudentsToLS({ skipCloud: true }); // نخزن نسخة محلية
+    } catch (err) {
+        console.warn("Could not sync teacher students from cloud, using local students.", err);
+        appState.students = loadStudentsFromLS();
+    }
 }
 
 function loadStudentsFromLS() {
@@ -2322,11 +2631,16 @@ function goToHome() {
     // نخلي بس الهوم screen هي الظاهرة
     showScreen("home-screen");
 }
+
 function goToStudents() {
     persistResumeBeforeNav();
-    // لو المستخدم طالب أو مش مسجل → ما إله دخل في صفحة البروفايلات
-    if (!appState.currentUser || appState.currentUser.role === "student") {
-        goToLevels();
+    const role = appState.currentUser?.role || "";
+    if (!appState.currentUser || role === "student" || role === "guest") {
+        if (getCurrentStudent()) {
+            goToLevels();
+        } else {
+            goToHome();
+        }
         return;
     }
     document.body.classList.remove("home-only");
@@ -2337,12 +2651,20 @@ function goToStudents() {
 function goToLevels() {
     persistResumeBeforeNav();
     document.body.classList.remove("home-only");
-    if (!getCurrentStudent()) {
-        goToStudents();
+    if (isGuestUser() && appState.guestStudent && !appState.currentStudentId) {
+        appState.currentStudentId = appState.guestStudent.id;
+    }
+    const currentStudent = getCurrentStudent();
+    if (!currentStudent) {
+        if (appState.currentUser?.role === "teacher") {
+            goToStudents();
+        } else {
+            goToHome();
+        }
         return;
     }
     showScreen("levels-screen");
-    $("#currentStudentNameLevels").textContent = getCurrentStudent().name;
+    $("#currentStudentNameLevels").textContent = currentStudent.name;
     const btnSwitchProfile = $("#btnSwitchProfile");
     const btnGoTeacherDashboard = $("#btnGoTeacherDashboard");
     if (btnSwitchProfile) btnSwitchProfile.style.display = isGuestUser() ? "none" : "inline-flex";
@@ -2365,7 +2687,7 @@ function goToLessonView(opts = {}) {
     }
     if (isGuestUser() && !isGuestAllowedLesson(appState.currentLessonId)) {
         toast("Guest access is limited to the first two units.");
-        goToLevels();
+        goToSubscribeScreen();
         return;
     }
     showScreen("lesson-screen");
@@ -2952,6 +3274,9 @@ function renderLevels() {
                 if (isGuestUser() && !isGuestAllowedLesson(lessonId)) {
                     pill.classList.add("unit-pill--locked");
                     statusSpan.textContent = "Locked (Guest)";
+                    pill.addEventListener("click", () => {
+                        goToSubscribeScreen();
+                    });
                 } else {
                     pill.classList.add("unit-pill--clickable");
                 }
@@ -3069,6 +3394,42 @@ function isGuestAllowedLesson(lessonId) {
     if (lesson.meta.level !== "Beginner") return false;
     const allowed = new Set(["Greetings", "Family"]);
     return allowed.has(lesson.meta.unit);
+}
+
+function goToSubscribeScreen() {
+    showScreen("subscribe-screen");
+    try {
+        if (typeof window.buildBookingSelects === "function") window.buildBookingSelects();
+    } catch { }
+}
+
+// Open subscribe modal
+function openSubscribeModal() {
+    const modal = document.getElementById("subscribeModal");
+    if (modal) {
+        const priceWrap = document.getElementById("subscribeSitePriceWrap");
+        const priceText = document.getElementById("subscribeSitePrice");
+        if (priceWrap && priceText) {
+            if (contactSettings.sitePrice) {
+                priceWrap.style.display = "block";
+                priceText.textContent = contactSettings.sitePrice;
+            } else {
+                priceWrap.style.display = "none";
+                priceText.textContent = "â€“";
+            }
+        }
+        modal.classList.add("modal--open");
+        console.log("Subscribe modal opened");
+    }
+}
+
+// Close subscribe modal
+function closeSubscribeModal() {
+    const modal = document.getElementById("subscribeModal");
+    if (modal) {
+        modal.classList.remove("modal--open");
+        console.log("Subscribe modal closed");
+    }
 }
 
 function isGrammarTabEnabled(lesson) {
@@ -4750,7 +5111,7 @@ function renderTeacherEditor(lessonId, anchorCard, preselectSection) {
         <button id="tdCloseEditor" class="btn btn--ghost btn--sm">Close Editor</button>
       </div>
     </div>
-    <h3>Editing: ${lesson.meta.level} – ${lesson.meta.unit} – ${lesson.meta.lessonTitle}</h3>
+    <h3>Editing: ${escapeHtml(lesson.meta.level)} – ${escapeHtml(lesson.meta.unit)} – ${escapeHtml(lesson.meta.lessonTitle)}</h3>
     <p class="teacher-edit-note">
       All changes here are saved locally and will apply to all students for this lesson.
     </p>
@@ -5068,25 +5429,25 @@ function renderTeacherEditor(lessonId, anchorCard, preselectSection) {
 
         row.innerHTML = `
           <div class="td-label">Arabic (with vowels)</div>
-          <input class="td-input td-input--ar td-vocab-ar" value="${item.ar || ""}" />
+          <input class="td-input td-input--ar td-vocab-ar" value="${escapeAttr(item.ar || "")}" />
 
           <div class="td-label">English meaning</div>
-          <input class="td-input td-vocab-en" value="${item.en || ""}" />
+          <input class="td-input td-vocab-en" value="${escapeAttr(item.en || "")}" />
 
           <div class="td-label">Arabeezy (optional)</div>
-          <input class="td-input td-vocab-arabeezy" value="${item.enArabeezy || ""}" />
+          <input class="td-input td-vocab-arabeezy" value="${escapeAttr(item.enArabeezy || "")}" />
 
           <div class="td-label">Hint (optional)</div>
-          <input class="td-input td-vocab-hint" value="${item.hint || ""}" />
+          <input class="td-input td-vocab-hint" value="${escapeAttr(item.hint || "")}" />
 
           <div class="td-label">Arabic example (optional)</div>
-          <textarea class="td-input td-input--ar td-vocab-ex-ar" rows="2">${item.exampleAr || ""}</textarea>
+          <textarea class="td-input td-input--ar td-vocab-ex-ar" rows="2">${escapeHtml(item.exampleAr || "")}</textarea>
 
           <div class="td-label">Arabeezy example (optional)</div>
-          <textarea class="td-input td-vocab-ex-arabeezy" rows="2">${item.exampleArabeezy || ""}</textarea>
+          <textarea class="td-input td-vocab-ex-arabeezy" rows="2">${escapeHtml(item.exampleArabeezy || "")}</textarea>
 
           <div class="td-label">English example (optional)</div>
-          <textarea class="td-input td-vocab-ex-en" rows="2">${item.exampleEn || ""}</textarea>
+          <textarea class="td-input td-vocab-ex-en" rows="2">${escapeHtml(item.exampleEn || "")}</textarea>
         `;
 
         const delBtn = document.createElement("button");
@@ -5154,54 +5515,27 @@ function renderTeacherEditor(lessonId, anchorCard, preselectSection) {
         alert("Extra vocabulary saved.");
     });
 
-    // ========== Dialogue ==========
-    const dlgList = $("#tdDialogueList");
-    dlgList.innerHTML = "";
-    lesson.dialogue.lines.forEach((line) => {
-        const row = document.createElement("div");
-        row.className = "td-row td-dialogue-row";
-        row.innerHTML = `
-      <input class="td-input td-input--small td-speaker" value="${line.speaker || ""}" />
-      <input class="td-input td-input--ar td-ar" value="${line.ar || ""}" />
-      <input class="td-input td-input--ar td-arabeezy" value="${line.arArabeezy || line.arabeezy || ""}" />
-      <input class="td-input td-input--en td-en" value="${line.en || ""}" />
-      <button type="button" class="btn btn--ghost btn--sm td-delete">Delete</button>
-    `;
-        row.querySelector(".td-delete").addEventListener("click", () => row.remove());
-        dlgList.appendChild(row);
+    wireDialogueEditor({ $, lesson, lessonId, saveLessonToLS, saveLessonToCloud });
+    wireGrammarEditor({
+        $,
+        lesson,
+        lessonId,
+        saveLessonToLS,
+        saveLessonToCloud,
+        escapeAttr,
+        escapeHtml,
     });
-
-    $("#tdAddDialogueLine").addEventListener("click", () => {
-        const row = document.createElement("div");
-        row.className = "td-row td-dialogue-row";
-        row.innerHTML = `
-      <input class="td-input td-input--small td-speaker" value="A" />
-      <input class="td-input td-input--ar td-ar" value="" placeholder="Arabic line" />
-      <input class="td-input td-input--ar td-arabeezy" value="" placeholder="Arabeezy line" />
-      <input class="td-input td-input--en td-en" value="" placeholder="English line" />
-      <button type="button" class="btn btn--ghost btn--sm td-delete">Delete</button>
-    `;
-        row.querySelector(".td-delete").addEventListener("click", () => row.remove());
-        dlgList.appendChild(row);
+    wireTranslationEditor({
+        $,
+        lesson,
+        lessonId,
+        saveLessonToLS,
+        saveLessonToCloud,
+        escapeHtml,
     });
+    wireQuizEditor({ $, lesson, lessonId, saveLessonToLS, saveLessonToCloud });
 
-    $("#tdSaveDialogue").addEventListener("click", () => {
-        const rows = dlgList.querySelectorAll(".td-dialogue-row");
-        const newLines = [];
-        rows.forEach((r) => {
-            const speaker = r.querySelector(".td-speaker").value.trim() || "A";
-            const ar = r.querySelector(".td-ar").value.trim();
-            const arArabeezy = r.querySelector(".td-arabeezy").value.trim();
-            const en = r.querySelector(".td-en").value.trim();
-            if (ar) newLines.push({ speaker, ar, arArabeezy, en });
-        });
-        lesson.dialogue.lines = newLines;
-        saveLessonToLS(lessonId);
-        // also sync online (shared)
-        saveLessonToCloud(lessonId);
-        alert("Dialogue saved.");
-    });
-
+    if (false) { // Legacy inline editor logic kept disabled during module migration.
     // ========== Grammar ==========
     const grammarList = $("#tdGrammarList");
     function renderGrammarRows() {
@@ -5214,13 +5548,13 @@ function renderTeacherEditor(lessonId, anchorCard, preselectSection) {
             row.className = "td-quiz-row";
             row.innerHTML = `
         <div class="td-label">Rule title</div>
-        <input class="td-input td-grammar-title" value="${g.title || ""}" />
+        <input class="td-input td-grammar-title" value="${escapeAttr(g.title || "")}" />
         <div class="td-label">Description</div>
-        <textarea class="td-input td-grammar-desc" rows="2">${g.description || ""}</textarea>
+        <textarea class="td-input td-grammar-desc" rows="2">${escapeHtml(g.description || "")}</textarea>
         <div class="td-label">Examples (Arabic | Arabeezy | English)</div>
-        <textarea class="td-input td-grammar-examples" rows="3">${exampleLines}</textarea>
+        <textarea class="td-input td-grammar-examples" rows="3">${escapeHtml(exampleLines)}</textarea>
         <div class="td-label">Teacher notes</div>
-        <textarea class="td-input td-grammar-notes" rows="2">${g.teacherNotes || ""}</textarea>
+        <textarea class="td-input td-grammar-notes" rows="2">${escapeHtml(g.teacherNotes || "")}</textarea>
       `;
             const delBtn = document.createElement("button");
             delBtn.type = "button";
@@ -5307,9 +5641,9 @@ function renderTeacherEditor(lessonId, anchorCard, preselectSection) {
         <option value="arToEn">Arabic → English</option>
       </select>
       <div class="td-label">English sentence</div>
-      <textarea class="td-input td-translation-en" rows="2">${item.textEn || ""}</textarea>
+      <textarea class="td-input td-translation-en" rows="2">${escapeHtml(item.textEn || "")}</textarea>
       <div class="td-label">Arabic sentence</div>
-      <textarea class="td-input td-input--ar td-translation-ar" rows="2">${item.textAr || ""}</textarea>
+      <textarea class="td-input td-input--ar td-translation-ar" rows="2">${escapeHtml(item.textAr || "")}</textarea>
     `;
 
         const typeSel = row.querySelector(".td-translation-type");
@@ -5441,16 +5775,27 @@ function renderTeacherEditor(lessonId, anchorCard, preselectSection) {
         const row = document.createElement("div");
         row.className = "td-quiz-row";
 
-        row.innerHTML = `
-      <div class="td-label">Question (Arabic)</div>
-      <textarea class="td-input td-input--ar td-quiz-question" rows="2" placeholder="السؤال بالعربي"></textarea>
-      <div class="td-label">Options (English)</div>
-      <div class="td-quiz-grid">
-        <input class="td-input" placeholder="Option 1" />
-        <input class="td-input" placeholder="Option 2" />
-        <input class="td-input" placeholder="Option 3" />
-      </div>
-    `;
+        const qLabel = document.createElement("div");
+        qLabel.className = "td-label";
+        qLabel.textContent = "Question (Arabic)";
+
+        const qInput = document.createElement("textarea");
+        qInput.className = "td-input td-input--ar td-quiz-question";
+        qInput.rows = 2;
+        qInput.placeholder = "Question in Arabic";
+
+        const optLabel = document.createElement("div");
+        optLabel.className = "td-label";
+        optLabel.textContent = "Options (English)";
+
+        const optGrid = document.createElement("div");
+        optGrid.className = "td-quiz-grid";
+        ["Option 1", "Option 2", "Option 3"].forEach((placeholder) => {
+            const inp = document.createElement("input");
+            inp.className = "td-input";
+            inp.placeholder = placeholder;
+            optGrid.appendChild(inp);
+        });
 
         const correctWrap = document.createElement("div");
         correctWrap.style.marginTop = "4px";
@@ -5487,6 +5832,10 @@ function renderTeacherEditor(lessonId, anchorCard, preselectSection) {
         correctWrap.appendChild(left);
         correctWrap.appendChild(delBtn);
 
+        row.appendChild(qLabel);
+        row.appendChild(qInput);
+        row.appendChild(optLabel);
+        row.appendChild(optGrid);
         row.appendChild(correctWrap);
         quizList.appendChild(row);
     });
@@ -5518,78 +5867,18 @@ function renderTeacherEditor(lessonId, anchorCard, preselectSection) {
         alert("MCQ saved.");
     });
 
-    // ========== Role-play ==========
-    const roleList = $("#tdRoleList");
-    roleList.innerHTML = "";
-    lesson.practice.rolePlays.forEach((rp) => {
-        const row = document.createElement("div");
-        row.className = "td-role-row";
-        const inp = document.createElement("input");
-        inp.className = "td-input td-role-input";
-        inp.value = rp;
-        const delBtn = document.createElement("button");
-        delBtn.type = "button";
-        delBtn.className = "btn btn--ghost btn--sm";
-        delBtn.textContent = "Delete";
-        delBtn.addEventListener("click", () => row.remove());
-        row.appendChild(inp);
-        row.appendChild(delBtn);
-        roleList.appendChild(row);
-    });
+    }
 
-    $("#tdAddRole").addEventListener("click", () => {
-        const row = document.createElement("div");
-        row.className = "td-role-row";
-        const inp = document.createElement("input");
-        inp.className = "td-input td-role-input";
-        inp.placeholder = "New speaking prompt...";
-        const delBtn = document.createElement("button");
-        delBtn.type = "button";
-        delBtn.className = "btn btn--ghost btn--sm";
-        delBtn.textContent = "Delete";
-        delBtn.addEventListener("click", () => row.remove());
-        row.appendChild(inp);
-        row.appendChild(delBtn);
-        roleList.appendChild(row);
-    });
-
-    $("#tdSaveRole").addEventListener("click", () => {
-        const rows = roleList.querySelectorAll(".td-role-row");
-        const newPrompts = [];
-        rows.forEach((r) => {
-            const txt = r.querySelector("input").value.trim();
-            if (txt) newPrompts.push(txt);
-        });
-        lesson.practice.rolePlays = newPrompts;
-        saveLessonToLS(lessonId);
-        // also sync online (shared)
-        saveLessonToCloud(lessonId);
-        alert("Role-play prompts saved.");
-    });
-
-    // ========== Homework ==========
-    $("#tdHomeworkText").value = lesson.homework.instructions || "";
-    $("#tdSaveHomework").addEventListener("click", () => {
-        lesson.homework.instructions = $("#tdHomeworkText").value.trim();
-        saveLessonToLS(lessonId);
-        // also sync online (shared)
-        saveLessonToCloud(lessonId);
-        alert("Homework instructions saved.");
-    });
-
-    // ========== Teacher Notes ==========
-    $("#tdTeacherNotes").value = lesson.teacherNotes.myNotes || "";
-    $("#tdSaveTeacherNotes").addEventListener("click", () => {
-        lesson.teacherNotes.myNotes = $("#tdTeacherNotes").value.trim();
-        saveLessonToLS(lessonId);
-        // also sync online (shared)
-        saveLessonToCloud(lessonId);
-        alert("Teacher notes saved.");
-    });
-
-    $("#tdCloseEditor").addEventListener("click", () => {
-        editor.style.display = "none";
-        editor.innerHTML = "";
+    // ========== Role-play / Homework / Teacher Notes ==========
+    wireRolePlayEditor({ $, lesson, lessonId, saveLessonToLS, saveLessonToCloud });
+    wireHomeworkEditor({ $, lesson, lessonId, saveLessonToLS, saveLessonToCloud });
+    wireTeacherNotesEditor({
+        $,
+        lesson,
+        lessonId,
+        saveLessonToLS,
+        saveLessonToCloud,
+        editor,
     });
 }
 // ================= AUTH MODAL HELPERS =================
@@ -5625,12 +5914,16 @@ function closeAuthModal() {
 }
 
 // ========================= DOM READY =========================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     loadLessonDataFromLS();
     loadCustomUnits();
     loadFontSize();
     appState.students = loadStudentsFromLS();
     loadBackupSettings();
+    loadContactSettings();
+    loadBookingSettings();
+    await loadBookingSettingsFromCloud();
+    ensureEmailJsInit();
 
     // top nav
     $all(".top-nav__link").forEach((btn) => {
@@ -5649,6 +5942,24 @@ document.addEventListener("DOMContentLoaded", () => {
             goToArabicLetters();
         });
     }
+    const btnSubscribe = $("#btnSubscribe");
+    if (btnSubscribe) {
+        btnSubscribe.addEventListener("click", () => {
+            openSubscribeModal();
+        });
+    }
+    const btnContact = $("#btnContact");
+    if (btnContact) {
+        btnContact.addEventListener("click", () => {
+            openWhatsAppWithMessage("Hi! I want to ask about Palestinian Arabic lessons.");
+        });
+    }
+    const btnBackFromSubscribe = document.getElementById("btnBackToUnitsFromSubscribe");
+    if (btnBackFromSubscribe) {
+        btnBackFromSubscribe.addEventListener("click", () => {
+            goToLevels();
+        });
+    }
     const btnLettersBackToUnits = $("#btnLettersBackToUnits");
     if (btnLettersBackToUnits) {
         btnLettersBackToUnits.addEventListener("click", () => {
@@ -5661,6 +5972,943 @@ document.addEventListener("DOMContentLoaded", () => {
             exportArabicLettersPdf();
         });
     }
+    const btnSaveContact = document.getElementById("btnSaveContact");
+    const contactSaveMsg = document.getElementById("contactSaveMsg");
+    const inputWhatsApp = document.getElementById("contactWhatsApp");
+    const inputSitePrice = document.getElementById("contactSitePrice");
+    if (inputWhatsApp) inputWhatsApp.value = contactSettings.whatsapp || "";
+    if (inputSitePrice) inputSitePrice.value = contactSettings.sitePrice || "";
+    if (btnSaveContact) {
+        btnSaveContact.addEventListener("click", () => {
+            contactSettings.whatsapp = inputWhatsApp ? inputWhatsApp.value.trim() : "";
+            contactSettings.sitePrice = inputSitePrice ? inputSitePrice.value.trim() : "";
+            saveContactSettings();
+            if (contactSaveMsg) contactSaveMsg.textContent = "Saved.";
+            setTimeout(() => {
+                if (contactSaveMsg) contactSaveMsg.textContent = "";
+            }, 1500);
+        });
+    }
+
+    // Availability editor
+    const availGrid = document.getElementById("availabilityGrid");
+    const availTz = document.getElementById("availTimezone");
+    const availSlot = document.getElementById("availSlotMinutes");
+    const availBreak = document.getElementById("availBreakMinutes");
+    const btnSaveAvail = document.getElementById("btnSaveAvailability");
+    const btnResetAvail = document.getElementById("btnResetAvailability");
+    const availSaveMsg = document.getElementById("availabilitySaveMsg");
+    const dayKeys = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    function renderAvailabilityEditor() {
+        if (availTz) availTz.value = bookingSettings.timezone || "";
+        if (availSlot) availSlot.value = bookingSettings.slotMinutes || 50;
+        if (availBreak) availBreak.value = bookingSettings.breakMinutes || 10;
+        if (!availGrid) return;
+        availGrid.innerHTML = dayKeys
+            .map((d) => {
+                const info = bookingSettings.days[d];
+                return `
+                    <div class="avail-day" data-day="${escapeAttr(d)}">
+                        <div class="avail-day__head">
+                            <input type="checkbox" data-avail-enabled ${info.enabled ? "checked" : ""} />
+                            <strong>${escapeHtml(d)}</strong>
+                        </div>
+                        <div class="form-field form-field--inline">
+                            <label>Start</label>
+                            <input type="time" data-avail-start value="${escapeAttr(info.start)}" />
+                        </div>
+                        <div class="form-field form-field--inline">
+                            <label>End</label>
+                            <input type="time" data-avail-end value="${escapeAttr(info.end)}" />
+                        </div>
+                    </div>
+                `;
+            })
+            .join("");
+    }
+    renderAvailabilityEditor();
+    if (btnSaveAvail) {
+        btnSaveAvail.addEventListener("click", async () => {
+            bookingSettings.timezone = availTz ? availTz.value.trim() : "";
+            bookingSettings.slotMinutes = Number(availSlot?.value || 50);
+            bookingSettings.breakMinutes = Number(availBreak?.value || 10);
+            bookingSettings.totalSlotMinutes = bookingSettings.slotMinutes + bookingSettings.breakMinutes;
+            if (availGrid) {
+                dayKeys.forEach((d) => {
+                    const el = availGrid.querySelector(`.avail-day[data-day="${d}"]`);
+                    if (!el) return;
+                    bookingSettings.days[d] = {
+                        enabled: !!el.querySelector("[data-avail-enabled]")?.checked,
+                        start: el.querySelector("[data-avail-start]")?.value || "09:00",
+                        end: el.querySelector("[data-avail-end]")?.value || "17:00",
+                    };
+                });
+            }
+            saveBookingSettings();
+            await saveBookingSettingsToCloud();
+            if (availSaveMsg) availSaveMsg.textContent = "Saved.";
+            setTimeout(() => {
+                if (availSaveMsg) availSaveMsg.textContent = "";
+            }, 1500);
+        });
+    }
+    if (btnResetAvail) {
+        btnResetAvail.addEventListener("click", async () => {
+            bookingSettings = getDefaultBookingSettings();
+            ensureBookingSettingsShape();
+            renderAvailabilityEditor();
+            saveBookingSettings();
+            await saveBookingSettingsToCloud();
+            renderExceptions();
+            await buildBookingSelects();
+            if (availSaveMsg) availSaveMsg.textContent = "Availability reset to fresh defaults.";
+            setTimeout(() => {
+                if (availSaveMsg) availSaveMsg.textContent = "";
+            }, 1800);
+        });
+    }
+
+    // Busy exceptions
+    const exceptionDate = document.getElementById("exceptionDate");
+    const exceptionStart = document.getElementById("exceptionStart");
+    const exceptionEnd = document.getElementById("exceptionEnd");
+    const exceptionNote = document.getElementById("exceptionNote");
+    const btnAddException = document.getElementById("btnAddException");
+    const exceptionsList = document.getElementById("exceptionsList");
+    const exceptionsMsg = document.getElementById("exceptionsMsg");
+    const btnConnectGoogleCalendar = document.getElementById("btnConnectGoogleCalendar");
+    const btnDisconnectGoogleCalendar = document.getElementById("btnDisconnectGoogleCalendar");
+    const btnImportGoogleCalendar = document.getElementById("btnImportGoogleCalendar");
+    const btnSyncBookingsNow = document.getElementById("btnSyncBookingsNow");
+    const googleCalendarMsg = document.getElementById("googleCalendarMsg");
+    const calendarStatusIndicator = document.getElementById("calendarStatusIndicator");
+    const calendarStatusText = document.getElementById("calendarStatusText");
+    const appsScriptWebAppUrl = document.getElementById("appsScriptWebAppUrl");
+    const btnSaveAppsScriptUrl = document.getElementById("btnSaveAppsScriptUrl");
+    const btnTestAppsScript = document.getElementById("btnTestAppsScript");
+    const btnImportBusyAppsScript = document.getElementById("btnImportBusyAppsScript");
+    const appsScriptMsg = document.getElementById("appsScriptMsg");
+    const preplyCalendarIdInput = document.getElementById("preplyCalendarIdInput");
+    const btnSavePreplyCalendarId = document.getElementById("btnSavePreplyCalendarId");
+    const btnTestPreplyCalendar = document.getElementById("btnTestPreplyCalendar");
+    let calendarSyncTimer = null;
+    let calendarBusyImportDone = false;
+
+    async function updateGoogleCalendarStatus() {
+        if (!calendarStatusIndicator || !calendarStatusText) return;
+        try {
+            const isConnected = await window.isGoogleCalendarConnected?.();
+            calendarStatusIndicator.className = `status-indicator ${isConnected ? 'connected' : 'disconnected'}`;
+            calendarStatusText.textContent = isConnected ? 'Connected' : 'Not connected';
+            if (btnConnectGoogleCalendar) btnConnectGoogleCalendar.style.display = isConnected ? 'none' : 'inline-block';
+            if (btnDisconnectGoogleCalendar) btnDisconnectGoogleCalendar.style.display = isConnected ? 'inline-block' : 'none';
+            if (appState.currentUser?.role === "teacher" && preplyCalendarIdInput) {
+                try {
+                    const teacherDoc = await db.collection("teachers").doc(appState.currentUser.uid).get();
+                    const teacherData = teacherDoc.exists ? (teacherDoc.data() || {}) : {};
+                    preplyCalendarIdInput.value = teacherData.preplyCalendarId || teacherData.googleCalendar?.preplyCalendarId || "";
+                    if (appsScriptWebAppUrl) appsScriptWebAppUrl.value = teacherData.appsScript?.webAppUrl || "";
+                } catch {}
+            }
+            if (isConnected) startCalendarAutoSync();
+            else stopCalendarAutoSync();
+            if (isConnected && appState.currentUser?.role === "teacher" && !calendarBusyImportDone) {
+                calendarBusyImportDone = true;
+                try {
+                    const result = await window.importGoogleCalendarEventsToBusyBlocks?.();
+                    if (result?.success) {
+                        await loadBookingSettingsFromCloud();
+                        renderExceptions();
+                        await buildBookingSelects();
+                    }
+                } catch {}
+            }
+        } catch {
+            calendarStatusIndicator.className = 'status-indicator disconnected';
+            calendarStatusText.textContent = 'Not connected';
+        }
+    }
+    function updateGoogleCalendarStatusMessage(message) {
+        if (googleCalendarMsg) googleCalendarMsg.textContent = message || "";
+    }
+    try { window.refreshGoogleCalendarStatus = updateGoogleCalendarStatus; } catch { }
+    try { window.updateGoogleCalendarStatusMessage = updateGoogleCalendarStatusMessage; } catch { }
+
+    async function refreshRuntimeBusyBlocks() {
+        runtimeBusyBlocks = [];
+        try {
+            const result = await window.fetchBusyBlocksFromAppsScript?.({
+                days: 35,
+                timeZone: bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
+            });
+            if (result?.success && Array.isArray(result.busyBlocks)) {
+                runtimeBusyBlocks = result.busyBlocks;
+            }
+        } catch {}
+    }
+
+    async function syncPendingBookingsToCalendar({ showMsg = true } = {}) {
+        if (!appState.currentUser || appState.currentUser.role !== "teacher") return;
+        const appsScriptResult = await window.syncPendingBookingsViaAppsScript?.({ limit: 10 });
+        if (appsScriptResult?.success || appsScriptResult?.syncedCount) {
+            if (showMsg && googleCalendarMsg) googleCalendarMsg.textContent = appsScriptResult.message;
+            await refreshRuntimeBusyBlocks();
+            await buildBookingSelects();
+            return;
+        }
+        if (!window.createGoogleCalendarEvent) return;
+        try {
+            const connected = await window.isGoogleCalendarConnected?.();
+            if (!connected) {
+                if (showMsg && googleCalendarMsg) googleCalendarMsg.textContent = "Google Calendar is not connected.";
+                return;
+            }
+            const tokenOk = await window.ensureGoogleCalendarAccess?.({ interactive: false });
+            if (!tokenOk) {
+                if (showMsg && googleCalendarMsg) googleCalendarMsg.textContent = "Reconnect Google Calendar, then try again.";
+                return;
+            }
+            const snap = await db
+                .collection("bookings")
+                .where("calendarSynced", "==", false)
+                .limit(10)
+                .get();
+            const pendingDocs = snap.docs.sort((a, b) => {
+                const aTs = a.data()?.createdAt || 0;
+                const bTs = b.data()?.createdAt || 0;
+                return aTs - bTs;
+            });
+            if (!pendingDocs.length) {
+                if (showMsg && googleCalendarMsg) googleCalendarMsg.textContent = "No pending bookings to sync.";
+                return;
+            }
+            let syncedCount = 0;
+            let failedCount = 0;
+            for (const doc of pendingDocs) {
+                const booking = doc.data();
+                if (!booking || !booking.slot || booking.status === "canceled") continue;
+                const slotDate = new Date(booking.slot);
+                const slotMinutes = bookingSettings.slotMinutes || 50;
+                const slotEnd = new Date(slotDate.getTime() + slotMinutes * 60000);
+                const eventData = {
+                    summary: `Lesson with ${booking.name}`,
+                    description: `Student: ${booking.name}\nEmail: ${booking.email}\nPhone: ${booking.phone}\nNotes: ${booking.notes || 'None'}\nBooking ID: ${doc.id}`,
+                    start: {
+                        dateTime: slotDate.toISOString(),
+                        timeZone: bookingSettings.timezone || getLocalTimezone()
+                    },
+                    end: {
+                        dateTime: slotEnd.toISOString(),
+                        timeZone: bookingSettings.timezone || getLocalTimezone()
+                    },
+                    attendees: [
+                        { email: booking.email, displayName: booking.name }
+                    ],
+                    reminders: { useDefault: true }
+                };
+                const googleEvent = await window.createGoogleCalendarEvent(eventData);
+                if (googleEvent) {
+                    await db.collection("bookings").doc(doc.id).set(
+                        {
+                            calendarSynced: true,
+                            googleCalendarEventId: googleEvent.id,
+                            history: firebase.firestore.FieldValue.arrayUnion({
+                                at: Date.now(),
+                                action: "calendar_synced",
+                                by: "system"
+                            })
+                        },
+                        { merge: true }
+                    );
+                    await db.collection("publicBookings").doc(doc.id).set(
+                        { calendarSynced: true, updatedAt: Date.now() },
+                        { merge: true }
+                    );
+                    syncedCount += 1;
+                } else {
+                    failedCount += 1;
+                }
+            }
+            if (showMsg && googleCalendarMsg) {
+                googleCalendarMsg.textContent = failedCount
+                    ? `Synced ${syncedCount} bookings. ${failedCount} need reconnect or retry.`
+                    : `Bookings synced to Google Calendar (${syncedCount}).`;
+            }
+        } catch (err) {
+            console.error("Booking sync failed:", err);
+            if (showMsg && googleCalendarMsg) googleCalendarMsg.textContent = err?.message || "Sync failed. Try reconnecting Google Calendar.";
+        }
+    }
+
+    function startCalendarAutoSync() {
+        if (calendarSyncTimer) return;
+        calendarSyncTimer = setInterval(() => {
+            syncPendingBookingsToCalendar({ showMsg: false });
+        }, 60000);
+        syncPendingBookingsToCalendar({ showMsg: false });
+    }
+
+    function stopCalendarAutoSync() {
+        if (calendarSyncTimer) clearInterval(calendarSyncTimer);
+        calendarSyncTimer = null;
+    }
+
+    if (btnConnectGoogleCalendar) {
+        btnConnectGoogleCalendar.addEventListener("click", async () => {
+            window.connectToGoogleCalendar?.((success, error) => {
+                if (googleCalendarMsg) {
+                    googleCalendarMsg.textContent = success ? "Google Calendar connected. Now save/test your Preply calendar if needed." : (error || "Connect failed.");
+                }
+                calendarBusyImportDone = false;
+                updateGoogleCalendarStatus();
+            });
+        });
+    }
+    if (btnDisconnectGoogleCalendar) {
+        btnDisconnectGoogleCalendar.addEventListener("click", async () => {
+            const ok = await window.disconnectFromGoogleCalendar?.();
+            if (googleCalendarMsg) googleCalendarMsg.textContent = ok ? "Google Calendar disconnected." : "Disconnect failed.";
+            updateGoogleCalendarStatus();
+        });
+    }
+    if (btnImportGoogleCalendar) {
+        btnImportGoogleCalendar.addEventListener("click", async () => {
+            if (googleCalendarMsg) googleCalendarMsg.textContent = "Importing...";
+            const result = await window.importGoogleCalendarEventsToBusyBlocks?.();
+            if (googleCalendarMsg) googleCalendarMsg.textContent = result?.message || "Import finished.";
+            await updateGoogleCalendarStatus();
+            await loadBookingSettingsFromCloud();
+            renderExceptions();
+            await buildBookingSelects();
+        });
+    }
+    if (btnSyncBookingsNow) {
+        btnSyncBookingsNow.addEventListener("click", async () => {
+            await syncPendingBookingsToCalendar();
+        });
+    }
+    if (btnSaveAppsScriptUrl) {
+        btnSaveAppsScriptUrl.addEventListener("click", async () => {
+            const result = await window.saveAppsScriptSettings?.({ webAppUrl: appsScriptWebAppUrl?.value || "" });
+            if (appsScriptMsg) appsScriptMsg.textContent = result?.message || "Apps Script save finished.";
+        });
+    }
+    if (btnTestAppsScript) {
+        btnTestAppsScript.addEventListener("click", async () => {
+            if (appsScriptMsg) appsScriptMsg.textContent = "Testing Apps Script...";
+            const result = await window.testAppsScriptConnection?.();
+            if (appsScriptMsg) appsScriptMsg.textContent = result?.message || "Apps Script test finished.";
+        });
+    }
+    if (btnImportBusyAppsScript) {
+        btnImportBusyAppsScript.addEventListener("click", async () => {
+            if (appsScriptMsg) appsScriptMsg.textContent = "Importing busy times from Apps Script...";
+            const result = await window.fetchBusyBlocksFromAppsScript?.({
+                days: 35,
+                timeZone: bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
+            });
+            if (result?.success && Array.isArray(result.busyBlocks)) {
+                bookingSettings.exceptions = result.busyBlocks;
+                saveBookingSettings();
+                await saveBookingSettingsToCloud();
+                runtimeBusyBlocks = result.busyBlocks;
+                renderExceptions();
+                await buildBookingSelects();
+                if (appsScriptMsg) appsScriptMsg.textContent = `Imported ${result.busyBlocks.length} busy blocks from Apps Script.`;
+            } else if (appsScriptMsg) {
+                appsScriptMsg.textContent = result?.message || "Apps Script import failed.";
+            }
+        });
+    }
+    if (btnSavePreplyCalendarId) {
+        btnSavePreplyCalendarId.addEventListener("click", async () => {
+            if (!appState.currentUser || appState.currentUser.role !== "teacher") return;
+            const value = (window.normalizeCalendarId?.(preplyCalendarIdInput?.value || "") || (preplyCalendarIdInput?.value || "").trim());
+            try {
+                await db.collection("teachers").doc(appState.currentUser.uid).set({
+                    preplyCalendarId: value,
+                    googleCalendar: {
+                        preplyCalendarId: value,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }
+                }, { merge: true });
+                try { window.preplyCalendarId = value; } catch {}
+                if (preplyCalendarIdInput) preplyCalendarIdInput.value = value;
+                if (googleCalendarMsg) googleCalendarMsg.textContent = value ? "Preply Calendar ID saved." : "Preply Calendar ID cleared.";
+            } catch (err) {
+                if (googleCalendarMsg) googleCalendarMsg.textContent = "Could not save Preply Calendar ID.";
+            }
+        });
+    }
+    if (btnTestPreplyCalendar) {
+        btnTestPreplyCalendar.addEventListener("click", async () => {
+            if (googleCalendarMsg) googleCalendarMsg.textContent = "Testing Preply calendar...";
+            const result = await window.testPreplyCalendarAccess?.();
+            if (googleCalendarMsg) googleCalendarMsg.textContent = result?.message || "Preply calendar test finished.";
+        });
+    }
+    updateGoogleCalendarStatus();
+
+    function renderExceptions() {
+        if (!exceptionsList) return;
+        const list = Array.isArray(bookingSettings.exceptions) ? bookingSettings.exceptions : [];
+        if (!list.length) {
+            exceptionsList.innerHTML = "<div class=\"small-note\">No busy blocks yet.</div>";
+            return;
+        }
+        exceptionsList.innerHTML = list
+            .map((ex, idx) => {
+                const note = ex.note ? `<div class="exception-item__note">${ex.note}</div>` : "";
+                return `
+                    <div class="exception-item" data-exception-index="${idx}">
+                        <div>
+                            <div class="exception-item__meta">${ex.date} · ${ex.start}–${ex.end}</div>
+                            ${note}
+                        </div>
+                        <button class="btn btn--ghost btn--sm" data-exception-remove>Remove</button>
+                    </div>
+                `;
+            })
+            .join("");
+    }
+
+    if (exceptionsList) {
+        exceptionsList.addEventListener("click", async (e) => {
+            const btn = e.target.closest("[data-exception-remove]");
+            if (!btn) return;
+            const item = btn.closest("[data-exception-index]");
+            if (!item) return;
+            const idx = Number(item.getAttribute("data-exception-index"));
+            if (Number.isNaN(idx)) return;
+            bookingSettings.exceptions.splice(idx, 1);
+            saveBookingSettings();
+            await saveBookingSettingsToCloud();
+            renderExceptions();
+            await buildBookingSelects();
+        });
+    }
+
+    if (btnAddException) {
+        btnAddException.addEventListener("click", async () => {
+            const date = (exceptionDate?.value || "").trim();
+            const start = (exceptionStart?.value || "").trim();
+            const end = (exceptionEnd?.value || "").trim();
+            const note = (exceptionNote?.value || "").trim();
+            if (!date || !start || !end) {
+                if (exceptionsMsg) exceptionsMsg.textContent = "Please choose date, start, and end.";
+                return;
+            }
+            if (toMinutes(end) <= toMinutes(start)) {
+                if (exceptionsMsg) exceptionsMsg.textContent = "End time must be after start time.";
+                return;
+            }
+            bookingSettings.exceptions.push({ date, start, end, note });
+            saveBookingSettings();
+            await saveBookingSettingsToCloud();
+            
+            if (exceptionNote) exceptionNote.value = "";
+            if (exceptionsMsg) exceptionsMsg.textContent = "Busy block added.";
+            setTimeout(() => {
+                if (exceptionsMsg) exceptionsMsg.textContent = "";
+            }, 1500);
+            renderExceptions();
+            await buildBookingSelects();
+        });
+    }
+
+    renderExceptions();
+
+    // Booking UI
+    const bookingForm = document.getElementById("bookingForm");
+    const bookingMsg = document.getElementById("bookingMsg");
+    const bookingSubmit = document.getElementById("bookingSubmit");
+    const bookingInfo = document.getElementById("bookingInfo");
+    const selectedTimeDisplay = document.getElementById("selectedTimeDisplay");
+    const bookingTimezoneLabel = document.getElementById("bookingTimezoneLabel");
+    const bookingDateChips = document.getElementById("bookingDateChips");
+    const bookingWeekPrev = document.getElementById("bookingWeekPrev");
+    const bookingWeekNext = document.getElementById("bookingWeekNext");
+    const bookingWeekLabel = document.getElementById("bookingWeekLabel");
+    const bookingWeeklyGrid = document.getElementById("bookingWeeklyGrid");
+    const bookingEmptyState = document.getElementById("bookingEmptyState");
+    const bookingStatusEmail = document.getElementById("bookingStatusEmail");
+    const bookingStatusBtn = document.getElementById("bookingStatusBtn");
+    const bookingStatusList = document.getElementById("bookingStatusList");
+    const bookingStatusMsg = document.getElementById("bookingStatusMsg");
+    const bookingSuccessModal = document.getElementById("bookingSuccessModal");
+    const bookingSuccessText = document.getElementById("bookingSuccessText");
+    const btnClearAllBookings = document.getElementById("btnClearAllBookings");
+    const btnClearBusyBlocks = document.getElementById("btnClearBusyBlocks");
+    let slotsByDate = new Map();
+    let scheduleByDate = new Map();
+    let bookingWeekOffset = 0;
+
+    function updateBookingInfo() {
+        if (!bookingInfo || !selectedTimeDisplay) return;
+        if (!window.selectedDate || !window.selectedTime) {
+            bookingInfo.style.display = "none";
+            selectedTimeDisplay.textContent = "";
+            return;
+        }
+        const dt = new Date(window.selectedDate);
+        const [h, m] = window.selectedTime.split(":").map(Number);
+        dt.setHours(h, m, 0, 0);
+        bookingInfo.style.display = "block";
+        selectedTimeDisplay.textContent = formatSlotTime(dt.getTime());
+    }
+
+    function renderDateChips(keys, activeKey = "") {
+        if (!bookingDateChips) return;
+        bookingDateChips.innerHTML = "";
+        keys.slice(0, 7).forEach((key) => {
+            const dateObj = new Date(`${key}T12:00:00`);
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "date-chip";
+            btn.textContent = dateObj.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+            if (activeKey === key) btn.classList.add("is-active");
+            btn.addEventListener("click", () => {
+                const slots = (scheduleByDate.get(key) || []).filter((slot) => slot.available).sort((a, b) => a.startMs - b.startMs);
+                if (slots.length) setSelectedSlot(new Date(slots[0].startMs));
+                buildBookingSelects();
+            });
+            bookingDateChips.appendChild(btn);
+        });
+    }
+
+    function getWeekStart(date, weekOffset = 0) {
+        const base = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        base.setDate(base.getDate() + weekOffset * 7);
+        return base;
+    }
+
+    function setSelectedSlot(slot) {
+        const dt = new Date(slot.getTime());
+        dt.setSeconds(0, 0);
+        window.selectedDate = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        window.selectedTime = dt.toTimeString().slice(0, 5);
+        if (bookingSubmit) bookingSubmit.disabled = false;
+        updateBookingInfo();
+    }
+
+    function renderWeeklyCalendar(activeDateKeys) {
+        if (!bookingWeeklyGrid) return;
+        bookingWeeklyGrid.innerHTML = "";
+        const weekStart = getWeekStart(new Date(), bookingWeekOffset);
+        const todayKey = getDateKey(new Date());
+        for (let i = 0; i < 7; i++) {
+            const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
+            const dateKey = getDateKey(day);
+            const slots = (scheduleByDate.get(dateKey) || []).slice().sort((a, b) => a.startMs - b.startMs);
+            const col = document.createElement("div");
+            const hasAvailable = slots.some((slot) => slot.available);
+            col.className = `booking-day-column${hasAvailable ? "" : " is-empty"}`;
+            const header = document.createElement("div");
+            header.className = "booking-day-header";
+            const headerLabel = document.createElement("div");
+            headerLabel.className = "booking-day-label";
+            headerLabel.textContent = dateKey === todayKey ? "Today" : day.toLocaleDateString([], { weekday: "short" });
+            const headerDate = document.createElement("div");
+            headerDate.className = "booking-day-date";
+            headerDate.textContent = day.toLocaleDateString([], { month: "short", day: "numeric" });
+            header.appendChild(headerLabel);
+            header.appendChild(headerDate);
+            const body = document.createElement("div");
+            body.className = "booking-day-slots";
+            if (!slots.length) {
+                const empty = document.createElement("div");
+                empty.className = "booking-day-empty";
+                empty.textContent = "No working times set";
+                body.appendChild(empty);
+            } else {
+                slots.forEach((slot) => {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = `slot-btn${slot.available ? "" : " is-unavailable"}`;
+                    btn.disabled = !slot.available;
+                    const slotDate = new Date(slot.startMs);
+                    btn.appendChild(
+                        document.createTextNode(
+                            slotDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                        )
+                    );
+                    if (!slot.available) {
+                        const meta = document.createElement("span");
+                        meta.className = "slot-btn__meta";
+                        meta.textContent = slot.reason || "";
+                        btn.appendChild(meta);
+                    }
+                    if (window.selectedDate && window.selectedTime) {
+                        const selectedStamp = `${getDateKey(window.selectedDate)} ${window.selectedTime}`;
+                        const slotStamp = `${getDateKey(slotDate)} ${slotDate.toTimeString().slice(0, 5)}`;
+                        if (selectedStamp === slotStamp) btn.classList.add("is-active");
+                    }
+                    if (slot.available) {
+                        btn.addEventListener("click", () => {
+                            setSelectedSlot(slotDate);
+                            buildBookingSelects();
+                        });
+                    }
+                    body.appendChild(btn);
+                });
+            }
+            col.appendChild(header);
+            col.appendChild(body);
+            bookingWeeklyGrid.appendChild(col);
+        }
+
+        if (bookingEmptyState) {
+            const hasAnySlots = Array.from({ length: 7 }, (_, idx) => {
+                const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + idx);
+                return (scheduleByDate.get(getDateKey(d)) || []).length > 0;
+            }).some(Boolean);
+            bookingEmptyState.style.display = hasAnySlots ? "none" : "block";
+        }
+
+        if (bookingWeekLabel) {
+            const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+            bookingWeekLabel.textContent = `${weekStart.toLocaleDateString([], { month: "short", day: "numeric" })} - ${weekEnd.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+        }
+
+        const visibleKeys = Array.from({ length: 7 }, (_, idx) => {
+            const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + idx);
+            return getDateKey(d);
+        });
+        renderDateChips(visibleKeys, window.selectedDate ? getDateKey(window.selectedDate) : getDateKey(weekStart));
+    }
+
+    function enableBookingGridDrag() {
+        if (!bookingWeeklyGrid || bookingWeeklyGrid.dataset.dragReady === "1") return;
+        bookingWeeklyGrid.dataset.dragReady = "1";
+        let isDown = false;
+        let startX = 0;
+        let startScrollLeft = 0;
+        bookingWeeklyGrid.addEventListener("pointerdown", (e) => {
+            if (e.target.closest(".slot-btn")) return;
+            isDown = true;
+            startX = e.clientX;
+            startScrollLeft = bookingWeeklyGrid.scrollLeft;
+            bookingWeeklyGrid.classList.add("is-dragging");
+        });
+        window.addEventListener("pointerup", () => {
+            isDown = false;
+            bookingWeeklyGrid.classList.remove("is-dragging");
+        });
+        bookingWeeklyGrid.addEventListener("pointermove", (e) => {
+            if (!isDown) return;
+            const dx = e.clientX - startX;
+            bookingWeeklyGrid.scrollLeft = startScrollLeft - dx;
+        });
+    }
+
+    async function buildBookingSelects() {
+        if (bookingTimezoneLabel) {
+            const tz = getLocalTimezone() || "your local timezone";
+            bookingTimezoneLabel.textContent = `Showing times in ${tz}`;
+        }
+
+        await refreshRuntimeBusyBlocks();
+        const schedule = await getSchedulableSlots(35);
+        slotsByDate = new Map();
+        scheduleByDate = new Map();
+        schedule.forEach((slot) => {
+            const key = slot.dateKey;
+            if (!scheduleByDate.has(key)) scheduleByDate.set(key, []);
+            scheduleByDate.get(key).push(slot);
+            if (!slot.available) return;
+            const dt = new Date(slot.startMs);
+            if (!slotsByDate.has(key)) slotsByDate.set(key, []);
+            slotsByDate.get(key).push(dt);
+        });
+
+        const dateKeys = Array.from(scheduleByDate.keys()).sort();
+        if (!dateKeys.length) {
+            if (bookingEmptyState) bookingEmptyState.style.display = "block";
+            window.selectedDate = null;
+            window.selectedTime = null;
+            if (bookingSubmit) bookingSubmit.disabled = true;
+            renderWeeklyCalendar([]);
+            updateBookingInfo();
+            return;
+        }
+
+        if (window.selectedDate && window.selectedTime) {
+            const selectedKey = getDateKey(window.selectedDate);
+            const stillAvailable = (slotsByDate.get(selectedKey) || []).some((slot) => slot.toTimeString().slice(0, 5) === window.selectedTime);
+            if (!stillAvailable) {
+                window.selectedDate = null;
+                window.selectedTime = null;
+                if (bookingSubmit) bookingSubmit.disabled = true;
+            }
+        }
+
+        const currentWeekStart = getWeekStart(new Date(), bookingWeekOffset);
+        const visibleHasSlots = Array.from({ length: 7 }, (_, idx) => {
+            const d = new Date(currentWeekStart.getFullYear(), currentWeekStart.getMonth(), currentWeekStart.getDate() + idx);
+            return (scheduleByDate.get(getDateKey(d)) || []).length > 0;
+        }).some(Boolean);
+        if (!visibleHasSlots && dateKeys.length) {
+            const firstAvailable = new Date(`${dateKeys[0]}T12:00:00`);
+            const today = new Date();
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const firstStart = new Date(firstAvailable.getFullYear(), firstAvailable.getMonth(), firstAvailable.getDate());
+            const dayDiff = Math.max(0, Math.floor((firstStart.getTime() - todayStart.getTime()) / 86400000));
+            bookingWeekOffset = Math.floor(dayDiff / 7);
+        }
+
+        renderWeeklyCalendar(dateKeys);
+        updateBookingInfo();
+    }
+
+    if (bookingWeekPrev) {
+        bookingWeekPrev.addEventListener("click", () => {
+            bookingWeekOffset = Math.max(0, bookingWeekOffset - 1);
+            buildBookingSelects();
+        });
+    }
+
+    if (bookingWeekNext) {
+        bookingWeekNext.addEventListener("click", () => {
+            bookingWeekOffset += 1;
+            buildBookingSelects();
+        });
+    }
+
+    buildBookingSelects();
+    enableBookingGridDrag();
+    try { window.buildBookingSelects = buildBookingSelects; } catch { }
+
+    async function loadBookingStatus(email) {
+        await loadBookingStatusByEmail({
+            db,
+            email,
+            bookingStatusList,
+            bookingStatusMsg,
+            hashEmail,
+            escapeHtml,
+            formatSlotTime,
+        });
+    }
+
+    if (bookingStatusBtn) {
+        bookingStatusBtn.addEventListener("click", () => {
+            const email = (bookingStatusEmail?.value || "").trim();
+            loadBookingStatus(email);
+        });
+    }
+    const lastEmail = (localStorage.getItem("pal_arabic_last_booking_email") || "").trim();
+    if (lastEmail && bookingStatusEmail) {
+        bookingStatusEmail.value = lastEmail;
+        loadBookingStatus(lastEmail);
+    }
+
+    if (bookingForm) {
+        bookingForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const selectedDate = window.selectedDate;
+            const selectedTime = window.selectedTime;
+            const name = (document.getElementById("bookingName").value || "").trim().slice(0, 100);
+            const email = (document.getElementById("bookingEmail").value || "").trim().toLowerCase().slice(0, 200);
+            const phoneRaw = (document.getElementById("bookingPhone").value || "").trim();
+            const phone = normalizePhone(phoneRaw);
+            const notes = (document.getElementById("bookingNotes").value || "").trim().slice(0, 1000);
+            const reasonLabels = getBookingReasonLabels();
+            const reason = reasonLabels.join(", ");
+            const level = (document.getElementById("bookingLevel")?.value || "").trim().slice(0, 100);
+            const lessonsPerMonth = (document.getElementById("bookingLessonsPerMonth")?.value || "").trim().slice(0, 50);
+            const honeypot = (document.getElementById("bookingWebsite")?.value || "").trim();
+            const studentTimeZone = getLocalTimezone() || "";
+            const studentLocale = navigator.language || "";
+            const countryHint = studentLocale.includes("-") ? studentLocale.split("-").pop() : studentLocale;
+            const bookingSubmitLabel = bookingSubmit?.querySelector(".btn__label");
+            if (!isValidEmail(email)) {
+                if (bookingMsg) bookingMsg.textContent = "Please enter a valid email.";
+                return;
+            }
+            if (!isValidPhone(phone)) {
+                if (bookingMsg) bookingMsg.textContent = "Please enter a valid phone number.";
+                return;
+            }
+            if (notes.length > 1000) {
+                if (bookingMsg) bookingMsg.textContent = "Notes are too long.";
+                return;
+            }
+            const recaptchaReady = isLocalDevHost() || !window.grecaptcha || typeof window.grecaptcha.getResponse !== "function"
+                ? true
+                : !!window.grecaptcha.getResponse();
+
+            await submitGuestBooking({
+                db,
+                bookingSettings,
+                getLocalTimezone,
+                selectedDate,
+                selectedTime,
+                formValues: {
+                    name,
+                    email,
+                    phone,
+                    notes,
+                    reasonLabels,
+                    reason,
+                    level,
+                    lessonsPerMonth,
+                    honeypot,
+                    studentTimeZone,
+                    studentLocale,
+                    countryHint,
+                    recaptchaReady,
+                },
+                bookingSubmit,
+                bookingSubmitLabel,
+                bookingMsg,
+                bookingSuccessModal,
+                bookingSuccessText,
+                bookingStatusEmail,
+                findBookingConflict,
+                buildBookingSelects,
+                hashEmail,
+                sendBookingEmail,
+                createBookingViaAppsScript: window.createBookingViaAppsScript,
+                loadBookingStatus,
+                isLocalDevHost,
+            });
+        });
+    }
+
+    // Teacher booking list
+    const teacherBookingList = document.getElementById("teacherBookingList");
+    const teacherBookingMsg = document.getElementById("teacherBookingMsg");
+    let bookingCache = new Map();
+
+    async function renderTeacherBookings() {
+        bookingCache = await renderTeacherBookingsView({
+            db,
+            teacherBookingList,
+            bookingCache,
+            escapeHtml,
+            formatSlotTime,
+        });
+    }
+
+    async function openReschedule(itemEl, booking) {
+        await openReschedulePanel({
+            itemEl,
+            booking,
+            getAvailableSlots,
+            escapeHtml,
+        });
+    }
+
+    if (teacherBookingList) {
+        teacherBookingList.addEventListener("click", async (e) => {
+            const btn = e.target.closest("[data-action]");
+            if (!btn) return;
+            const item = btn.closest("[data-booking-id]");
+            if (!item) return;
+            const bookingId = item.getAttribute("data-booking-id");
+            const booking = bookingCache.get(bookingId);
+            const action = btn.getAttribute("data-action");
+            if (!booking) return;
+
+            if (action === "cancel") {
+                try {
+                    await cancelTeacherBooking({ db, firebase, bookingId });
+                    if (teacherBookingMsg) teacherBookingMsg.textContent = "Booking canceled.";
+                    await renderTeacherBookings();
+                    await buildBookingSelects();
+                } catch {
+                    if (teacherBookingMsg) teacherBookingMsg.textContent = "Cancel failed.";
+                }
+                return;
+            }
+
+            if (action === "reschedule") {
+                await openReschedule(item, booking);
+                return;
+            }
+
+            if (action === "close-reschedule") {
+                const resched = item.querySelector(".booking-item__resched");
+                if (resched) {
+                    resched.classList.remove("is-open");
+                    resched.innerHTML = "";
+                }
+                return;
+            }
+
+            if (action === "confirm-reschedule") {
+                const select = item.querySelector(".booking-resched-select");
+                const newSlot = select ? Number(select.value) : null;
+                if (!newSlot || Number.isNaN(newSlot)) return;
+                if (newSlot === booking.slot) {
+                    if (teacherBookingMsg) teacherBookingMsg.textContent = "Pick a different time.";
+                    return;
+                }
+                try {
+                    const conflict = await findBookingConflict(newSlot, { excludeBookingId: bookingId });
+                    if (conflict) {
+                        if (teacherBookingMsg) teacherBookingMsg.textContent = "That slot is taken.";
+                        return;
+                    }
+                    await rescheduleTeacherBooking({
+                        db,
+                        firebase,
+                        bookingId,
+                        booking,
+                        newSlot,
+                    });
+                    if (teacherBookingMsg) teacherBookingMsg.textContent = "Booking rescheduled.";
+                    await renderTeacherBookings();
+                    await buildBookingSelects();
+                } catch {
+                    if (teacherBookingMsg) teacherBookingMsg.textContent = "Reschedule failed.";
+                }
+            }
+        });
+        renderTeacherBookings();
+    }
+
+    if (btnClearBusyBlocks) {
+        btnClearBusyBlocks.addEventListener("click", async () => {
+            if (!window.confirm("Clear all busy blocks? This cannot be undone.")) return;
+            bookingSettings.exceptions = [];
+            saveBookingSettings();
+            await saveBookingSettingsToCloud();
+            renderExceptions();
+            await buildBookingSelects();
+            if (teacherBookingMsg) teacherBookingMsg.textContent = "Busy blocks cleared.";
+        });
+    }
+
+    if (btnClearAllBookings) {
+        btnClearAllBookings.addEventListener("click", async () => {
+            if (!appState.currentUser || appState.currentUser.role !== "teacher") return;
+            if (!window.confirm("Delete all bookings from both private and public collections? This cannot be undone.")) return;
+            try {
+                await clearAllTeacherBookings({ db });
+                if (bookingStatusList) bookingStatusList.innerHTML = "";
+                if (teacherBookingMsg) teacherBookingMsg.textContent = "All bookings cleared.";
+                await renderTeacherBookings();
+                await buildBookingSelects();
+            } catch (err) {
+                if (teacherBookingMsg) teacherBookingMsg.textContent = "Could not clear bookings.";
+            }
+        });
+    }
+
+    // Subscribe screen wiring
+    const guestSiteWhatsApp = document.getElementById("guestSiteWhatsApp");
+    if (guestSiteWhatsApp) {
+        guestSiteWhatsApp.addEventListener("click", () => {
+            openWhatsAppWithMessage("Hi! I want full site access.");
+        });
+    }
+    const trialContactBtn = document.getElementById("trialContactBtn");
+    if (trialContactBtn) {
+        trialContactBtn.addEventListener("click", () => {
+            openWhatsAppWithMessage("Hi! I want to ask about the free 50-minute trial lesson.");
+        });
+    }
     initArabicLettersScreen();
 
     // hero buttons
@@ -5668,6 +6916,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnHeroStudent = document.getElementById("btnHeroStudent");
     const btnHeroTeacher = document.getElementById("btnHeroTeacher");
     const btnHeroGuest = document.getElementById("btnHeroGuest");
+    const btnHeroSubscribe = document.getElementById("btnHeroSubscribe");
 
     if (btnHeroStudent) {
         btnHeroStudent.addEventListener("click", () => {
@@ -5702,6 +6951,40 @@ document.addEventListener("DOMContentLoaded", () => {
             goToLevels();
         });
     }
+    if (btnHeroSubscribe) {
+        btnHeroSubscribe.addEventListener("click", () => {
+            openSubscribeModal();
+        });
+    }
+
+    // Subscribe modal buttons
+    const subscribeWhatsAppBtn = document.getElementById("subscribeWhatsAppBtn");
+    const subscribeBookingBtn = document.getElementById("subscribeBookingBtn");
+
+    if (subscribeWhatsAppBtn) {
+        subscribeWhatsAppBtn.addEventListener("click", () => {
+            closeSubscribeModal();
+            openWhatsAppWithMessage("Hello, I'm interested in Full Site Access. Can you please provide more information?");
+        });
+    }
+
+    document.querySelectorAll("[data-close-booking-success]").forEach((el) => {
+        el.addEventListener("click", () => {
+            if (bookingSuccessModal) bookingSuccessModal.classList.remove("modal--open");
+        });
+    });
+
+    if (subscribeBookingBtn) {
+        subscribeBookingBtn.addEventListener("click", () => {
+            closeSubscribeModal();
+            goToSubscribeScreen();
+        });
+    }
+
+    // Close subscribe modal on backdrop click
+    document.querySelectorAll("[data-close-subscribe]").forEach(el => {
+        el.addEventListener("click", closeSubscribeModal);
+    });
 
     // add student
     $("#addStudentForm").addEventListener("submit", (e) => {
@@ -6046,7 +7329,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (microCheckCloseBtn) {
         microCheckCloseBtn.addEventListener("click", () => continueFromMicroCheck());
     }
-    document.getElementById("btnLogin").addEventListener("click", openAuthModal);
+    document.getElementById("btnLogin").addEventListener("click", () => openAuthModal());
     document
         .querySelectorAll("[data-close-auth]")
         .forEach((el) => el.addEventListener("click", closeAuthModal));
@@ -6085,18 +7368,20 @@ document.addEventListener("DOMContentLoaded", () => {
             let cred;
 
             if (role === "teacher") {
+                if (!canUseTeacherRole(email)) {
+                    if (errorBox) errorBox.textContent = "Teacher access is restricted.";
+                    return;
+                }
                 // المدرّس: sign in ثم sign up لو مش موجود
                 try {
                     cred = await auth.signInWithEmailAndPassword(email, password);
                 } catch (err) {
                     if (err.code === "auth/user-not-found") {
                         // أول مرة → ننشئ حساب مدرس
-                        cred = await auth.createUserWithEmailAndPassword(email, password);
-                        await db.collection("users").doc(cred.user.uid).set({
-                            email,
-                            role: "teacher",
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        });
+                        if (errorBox) {
+                            errorBox.textContent = "Teacher account must be created securely in advance. Automatic teacher sign-up is disabled.";
+                        }
+                        return;
                     } else {
                         throw err;
                     }
@@ -6120,10 +7405,17 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // نقرأ بيانات المستخدم من Firestore
-            const userDoc = await db.collection("users").doc(cred.user.uid).get();
-            const data = userDoc.data() || {};
+            const { role: finalRole } = await resolveUserRole({
+                db,
+                uid: cred.user.uid,
+                email: cred.user.email,
+                savedRole: null,
+                fallbackRole: role,
+            });
 
-            const finalRole = data.role || role || "student";
+            if (finalRole === "teacher") {
+                await bootstrapTeacherAccess({ db, firebase, uid: cred.user.uid, email: cred.user.email });
+            }
 
             appState.currentUser = {
                 uid: cred.user.uid,
@@ -6315,19 +7607,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 // 🧑‍🎓 إنشاء المستخدم الجديد باستخدام الـ secondary auth
-                const cred = await secAuth.createUserWithEmailAndPassword(email, password);
-                const uid = cred.user.uid;
-
-                // كتابة بيانات الطالب في Firestore
-                await db.collection("users").doc(uid).set({
+                await createStudentAccount({
+                    db,
+                    firebase,
+                    secondaryAuth: secAuth,
+                    teacherUid: appState.currentUser.uid || null,
                     email,
-                    role: "student",
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: appState.currentUser.uid || null, // المدرّس الذي أنشأه (اختياري)
+                    password,
                 });
-
-                // تسجيل خروج من الـ secondary auth فقط (ما يمس جلسة المدرّس)
-                await secAuth.signOut();
 
                 // تنظيف الحقول
                 emailEl.value = "";
@@ -6414,17 +7701,14 @@ async function handleCreateStudentSubmit(e) {
             return;
         }
 
-        const cred = await secAuth.createUserWithEmailAndPassword(email, password);
-        const uid = cred.user.uid;
-
-        await db.collection("users").doc(uid).set({
+        await createStudentAccount({
+            db,
+            firebase,
+            secondaryAuth: secAuth,
+            teacherUid: appState.currentUser.uid || null,
             email,
-            role: "student",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: appState.currentUser.uid || null,
+            password,
         });
-
-        await secAuth.signOut();
 
         emailEl.value = "";
         passwordEl.value = "";
@@ -6495,3 +7779,7 @@ function toast(message) {
 
 // ---- Expose key functions to window for cross-module access ----
 try { Object.assign(window, { saveLessonToLS, toast, renderLesson, renderLevels }); } catch (e) { }
+
+
+
+

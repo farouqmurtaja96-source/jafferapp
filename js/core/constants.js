@@ -7,6 +7,8 @@ export const LS_CUSTOM_UNITS_KEY = "pal_arabic_custom_units";
 export const LS_BACKUP_SETTINGS_KEY = "pal_arabic_backup_settings";
 export const LS_WHITEBOARD_PREFIX = "pal_arabic_whiteboard_";
 export const LS_USER_ROLE_KEY = "pal_arabic_user_role";
+export const LS_CONTACT_SETTINGS_KEY = "pal_arabic_contact_settings";
+export const LS_BOOKING_SETTINGS_KEY = "pal_arabic_booking_settings";
 
 export const LESSON_ID_GREETING = "Beginner-Greetings-L1";
 export const LESSON_ID_DAILY_ROUTINE = "Beginner-DailyRoutine-L1";

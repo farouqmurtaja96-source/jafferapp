@@ -1,0 +1,191 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDocPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function requestUserDoc() {
+      return get(userDocPath(request.auth.uid));
+    }
+
+    function ownsDoc(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function authEmail() {
+      return signedIn() && request.auth.token.email is string
+        ? request.auth.token.email
+        : "";
+    }
+
+    function isAllowedTeacherEmail() {
+      return authEmail() in [
+        "farouqmoh@hotmail.com",
+        "farouqmurtaja96@gmail.com"
+      ];
+    }
+
+    function isTeacher() {
+      return signedIn() &&
+        requestUserDoc().data.role == "teacher" &&
+        isAllowedTeacherEmail();
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    function isValidPhone(phone) {
+      return phone is string &&
+        phone.matches('^[+]?[0-9]{8,15}$');
+    }
+
+    function isTimestampNumber(value) {
+      return value is int || value is float;
+    }
+
+    function isSafeStatus(status) {
+      return status in ["booked", "pending", "canceled", "rescheduled"];
+    }
+
+    match /users/{uid} {
+      allow read: if ownsDoc(uid);
+
+      allow create: if ownsDoc(uid) &&
+        request.resource.data.keys().hasOnly(['email', 'role', 'createdAt', 'createdBy']) &&
+        isValidEmail(request.resource.data.email) &&
+        request.resource.data.email == authEmail() &&
+        (
+          request.resource.data.role == "student" ||
+          (request.resource.data.role == "teacher" && isAllowedTeacherEmail())
+        );
+
+      allow update: if ownsDoc(uid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email']) &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.role == resource.data.role;
+
+      allow delete: if false;
+    }
+
+    match /teachers/{uid} {
+      allow read: if ownsDoc(uid) && isTeacher();
+
+      allow create: if ownsDoc(uid) &&
+        isTeacher() &&
+        request.resource.data.keys().hasOnly([
+          'email', 'name', 'settings', 'googleCalendar',
+          'preplyCalendarId', 'appsScript', 'updatedAt', 'createdAt'
+        ]);
+
+      allow update: if ownsDoc(uid) &&
+        isTeacher() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'email', 'name', 'settings', 'googleCalendar',
+          'preplyCalendarId', 'appsScript', 'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    match /teacherStudents/{docId} {
+      allow read: if isTeacher() && resource.data.teacherId == request.auth.uid;
+      allow create: if isTeacher() &&
+        request.resource.data.teacherId == request.auth.uid &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0;
+      allow update: if isTeacher() &&
+        resource.data.teacherId == request.auth.uid &&
+        request.resource.data.teacherId == request.auth.uid;
+      allow delete: if isTeacher() && resource.data.teacherId == request.auth.uid;
+    }
+
+    match /lessonTemplates/{docId} {
+      allow read: if signedIn();
+      allow create: if isTeacher() &&
+        request.resource.data.lesson is map &&
+        request.resource.data.lesson.title is string &&
+        request.resource.data.lesson.title.size() > 0;
+      allow update, delete: if isTeacher();
+    }
+
+    match /bookingSettings/{docId} {
+      allow read: if true;
+
+      allow create: if isTeacher() &&
+        request.resource.data.keys().hasOnly([
+          'timezone', 'slotMinutes', 'breakMinutes',
+          'totalSlotMinutes', 'days', 'exceptions', 'appsScript', 'updatedAt'
+        ]);
+
+      allow update: if isTeacher() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'timezone', 'slotMinutes', 'breakMinutes',
+          'totalSlotMinutes', 'days', 'exceptions', 'appsScript', 'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    match /publicBookings/{docId} {
+      allow read: if true;
+
+      allow create: if request.resource.data.keys().hasOnly([
+          'slot', 'status', 'emailHash', 'createdAt',
+          'updatedAt', 'calendarSynced', 'source'
+        ]) &&
+        isTimestampNumber(request.resource.data.slot) &&
+        request.resource.data.emailHash is string &&
+        request.resource.data.emailHash.size() >= 32 &&
+        request.resource.data.source == "guest" &&
+        request.resource.data.status == "booked";
+
+      allow update: if isTeacher() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'slot', 'status', 'updatedAt', 'calendarSynced',
+          'rescheduledFrom', 'rescheduledAt'
+        ]) &&
+        isSafeStatus(request.resource.data.status);
+
+      allow delete: if isTeacher();
+    }
+
+    match /bookings/{docId} {
+      allow create: if request.resource.data.keys().hasOnly([
+          'slot', 'name', 'email', 'phone', 'notes', 'status',
+          'createdAt', 'updatedAt', 'calendarSynced', 'googleCalendarEventId',
+          'source', 'reason', 'reasonLabels', 'level', 'lessonsPerMonth',
+          'studentTimeZone', 'studentLocale', 'countryHint', 'timezone', 'history'
+        ]) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        isValidEmail(request.resource.data.email) &&
+        isValidPhone(request.resource.data.phone) &&
+        isTimestampNumber(request.resource.data.slot) &&
+        request.resource.data.status == "booked" &&
+        request.resource.data.source == "guest";
+
+      allow read: if isTeacher();
+
+      allow update: if isTeacher() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'slot', 'notes', 'status', 'updatedAt', 'calendarSynced',
+          'googleCalendarEventId', 'history', 'canceledAt',
+          'rescheduledFrom', 'rescheduledAt'
+        ]) &&
+        isSafeStatus(request.resource.data.status);
+
+      allow delete: if isTeacher();
+    }
+
+    match /errorLogs/{docId} {
+      allow read, write: if isTeacher();
+    }
+  }
+}
