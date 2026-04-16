@@ -134,8 +134,9 @@ class ErrorHandler {
 
     // Handle async errors with timeout
     async withTimeout(asyncFn, timeoutMs = 10000, timeoutMessage = 'انتهت مهلة العملية') {
+        const task = typeof asyncFn === 'function' ? asyncFn() : asyncFn;
         return Promise.race([
-            asyncFn(),
+            Promise.resolve(task),
             new Promise((_, reject) => 
                 setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
             )

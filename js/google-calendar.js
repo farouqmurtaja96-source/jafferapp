@@ -272,7 +272,7 @@ async function connectToGoogleCalendar(callback) {
         console.log("Attempting to initialize Google Calendar API...");
         try {
             await errorHandler.withTimeout(
-                initializeGoogleCalendar(),
+                () => initializeGoogleCalendar(),
                 10000,
                 'فشل تهيئة Google Calendar API - انتهت المهلة'
             );
