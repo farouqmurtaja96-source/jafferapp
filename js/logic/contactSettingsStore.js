@@ -51,6 +51,20 @@ export async function saveContactSettingsToCloud(db, firebase, settings) {
     } catch {}
 }
 
+export function extractWhatsAppNumber(settings) {
+    const raw = (settings?.whatsapp || "").trim();
+    if (!raw) return "";
+    if (raw.startsWith("http")) {
+        try {
+            const url = new URL(raw);
+            return (url.searchParams.get("phone") || "").replace(/[^0-9]/g, "");
+        } catch {
+            return "";
+        }
+    }
+    return raw.replace(/[^0-9]/g, "");
+}
+
 export function buildWhatsAppUrl(settings, message) {
     const raw = (settings?.whatsapp || "").trim();
     if (!raw) return null;
@@ -58,7 +72,7 @@ export function buildWhatsAppUrl(settings, message) {
         const sep = raw.includes("?") ? "&" : "?";
         return `${raw}${sep}text=${encodeURIComponent(message)}`;
     }
-    const number = raw.replace(/[^0-9]/g, "");
+    const number = extractWhatsAppNumber(settings);
     if (!number) return null;
     return `https://api.whatsapp.com/send?phone=${number}&text=${encodeURIComponent(message)}`;
 }

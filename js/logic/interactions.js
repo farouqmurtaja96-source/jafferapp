@@ -10,6 +10,7 @@ import {
     loadContactSettings as loadStoredContactSettings,
     saveContactSettings as saveStoredContactSettings,
     buildWhatsAppUrl as buildWhatsAppUrlFromSettings,
+    extractWhatsAppNumber,
     loadContactSettingsFromCloud as loadContactSettingsStateFromCloud,
     saveContactSettingsToCloud as saveContactSettingsStateToCloud,
 } from './contactSettingsStore.js';
@@ -202,21 +203,50 @@ function isTikTokInAppBrowser() {
     return /TikTok|BytedanceWebview|musical_ly/i.test(ua);
 }
 
+function isMobileDevice() {
+    const ua = navigator.userAgent || "";
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+}
+
 function openWhatsAppWithMessage(message) {
-    const url = buildWhatsAppUrl(message);
-    if (!url) {
+    const webUrl = buildWhatsAppUrl(message);
+    const number = extractWhatsAppNumber(contactSettings);
+    if (!webUrl || !number) {
         toast("WhatsApp contact not set.");
         return;
     }
+
+    const appUrl = `whatsapp://send?phone=${number}&text=${encodeURIComponent(message)}`;
+
     if (isTikTokInAppBrowser()) {
         try {
-            navigator.clipboard?.writeText(url);
+            navigator.clipboard?.writeText(webUrl);
         } catch {}
-        toast("If TikTok blocks WhatsApp, paste the copied link in your browser.");
-        window.location.href = url;
+        toast("If TikTok blocks WhatsApp, open in browser or paste the copied link.");
+        window.location.href = webUrl;
         return;
     }
-    window.open(url, "_blank", "noopener,noreferrer");
+
+    if (isMobileDevice()) {
+        const fallbackTimer = setTimeout(() => {
+            window.location.href = webUrl;
+        }, 900);
+
+        const clearFallback = () => {
+            clearTimeout(fallbackTimer);
+            document.removeEventListener("visibilitychange", clearFallback);
+            window.removeEventListener("pagehide", clearFallback);
+            window.removeEventListener("blur", clearFallback);
+        };
+
+        document.addEventListener("visibilitychange", clearFallback, { once: true });
+        window.addEventListener("pagehide", clearFallback, { once: true });
+        window.addEventListener("blur", clearFallback, { once: true });
+        window.location.href = appUrl;
+        return;
+    }
+
+    window.open(webUrl, "_blank", "noopener,noreferrer");
 }
 
 function ensureEmailJsInit() {
