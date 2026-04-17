@@ -197,13 +197,26 @@ function buildWhatsAppUrl(message) {
     return buildWhatsAppUrlFromSettings(contactSettings, message);
 }
 
+function isTikTokInAppBrowser() {
+    const ua = navigator.userAgent || "";
+    return /TikTok|BytedanceWebview|musical_ly/i.test(ua);
+}
+
 function openWhatsAppWithMessage(message) {
     const url = buildWhatsAppUrl(message);
     if (!url) {
         toast("WhatsApp contact not set.");
         return;
     }
-    window.open(url, "_blank");
+    if (isTikTokInAppBrowser()) {
+        try {
+            navigator.clipboard?.writeText(url);
+        } catch {}
+        toast("If TikTok blocks WhatsApp, paste the copied link in your browser.");
+        window.location.href = url;
+        return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function ensureEmailJsInit() {
