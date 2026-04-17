@@ -121,13 +121,15 @@ service cloud.firestore {
       allow create: if isTeacher() &&
         request.resource.data.keys().hasOnly([
           'timezone', 'slotMinutes', 'breakMinutes',
-          'totalSlotMinutes', 'days', 'exceptions', 'appsScript', 'updatedAt'
+          'totalSlotMinutes', 'days', 'exceptions', 'appsScript',
+          'whatsapp', 'sitePrice', 'updatedAt'
         ]);
 
       allow update: if isTeacher() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'timezone', 'slotMinutes', 'breakMinutes',
-          'totalSlotMinutes', 'days', 'exceptions', 'appsScript', 'updatedAt'
+          'totalSlotMinutes', 'days', 'exceptions', 'appsScript',
+          'whatsapp', 'sitePrice', 'updatedAt'
         ]);
 
       allow delete: if false;

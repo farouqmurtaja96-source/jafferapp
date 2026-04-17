@@ -10,6 +10,8 @@ import {
     loadContactSettings as loadStoredContactSettings,
     saveContactSettings as saveStoredContactSettings,
     buildWhatsAppUrl as buildWhatsAppUrlFromSettings,
+    loadContactSettingsFromCloud as loadContactSettingsStateFromCloud,
+    saveContactSettingsToCloud as saveContactSettingsStateToCloud,
 } from './contactSettingsStore.js';
 import {
     createInitialBookingSettings,
@@ -171,6 +173,15 @@ function loadContactSettings() {
 
 function saveContactSettings() {
     saveStoredContactSettings(LS_CONTACT_SETTINGS_KEY, contactSettings);
+}
+
+async function loadContactSettingsFromCloud() {
+    contactSettings = await loadContactSettingsStateFromCloud(db, contactSettings);
+    return contactSettings;
+}
+
+async function saveContactSettingsToCloud() {
+    await saveContactSettingsStateToCloud(db, firebase, contactSettings);
 }
 
 async function ensureTeacherDoc(uid, email) {
@@ -5922,6 +5933,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadBackupSettings();
     loadContactSettings();
     loadBookingSettings();
+    await loadContactSettingsFromCloud();
     await loadBookingSettingsFromCloud();
     ensureEmailJsInit();
 
@@ -5979,10 +5991,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (inputWhatsApp) inputWhatsApp.value = contactSettings.whatsapp || "";
     if (inputSitePrice) inputSitePrice.value = contactSettings.sitePrice || "";
     if (btnSaveContact) {
-        btnSaveContact.addEventListener("click", () => {
+        btnSaveContact.addEventListener("click", async () => {
             contactSettings.whatsapp = inputWhatsApp ? inputWhatsApp.value.trim() : "";
             contactSettings.sitePrice = inputSitePrice ? inputSitePrice.value.trim() : "";
             saveContactSettings();
+            await saveContactSettingsToCloud();
             if (contactSaveMsg) contactSaveMsg.textContent = "Saved.";
             setTimeout(() => {
                 if (contactSaveMsg) contactSaveMsg.textContent = "";
