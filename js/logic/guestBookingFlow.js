@@ -153,7 +153,11 @@ export async function submitGuestBooking({
         const bookingRef = db.collection("bookings").doc();
         let calendarSynced = false;
         let googleCalendarEventId = null;
+        let teacherEmailSent = false;
         let studentEmailSent = false;
+        let appsScriptMessage = "";
+        let teacherEmailError = "";
+        let studentEmailError = "";
         const appsScriptSync = await createBookingViaAppsScript?.({
             bookingId: bookingRef.id,
             slot: selectedSlot,
@@ -170,7 +174,13 @@ export async function submitGuestBooking({
         if (appsScriptSync?.success) {
             calendarSynced = true;
             googleCalendarEventId = appsScriptSync.eventId || null;
+            teacherEmailSent = !!appsScriptSync.notificationSent;
             studentEmailSent = !!appsScriptSync.studentConfirmationSent;
+            teacherEmailError = appsScriptSync.notificationError || "";
+            studentEmailError = appsScriptSync.studentConfirmationError || "";
+            appsScriptMessage = appsScriptSync.message || "";
+        } else {
+            appsScriptMessage = appsScriptSync?.message || "";
         }
 
         await bookingRef.set({
@@ -228,34 +238,54 @@ export async function submitGuestBooking({
             notes ? `Notes: ${notes}` : "",
         ].filter(Boolean).join("\n");
 
-        sendBookingEmail({
-            name,
-            email,
-            phone,
-            notes: combinedNotes,
-            slot,
-            studentTimeZone,
-            studentLocale,
-            teacherTimeZone: bookingSettings.timezone || getLocalTimezone() || "",
-            reasons: reason,
-            level,
-            lessonsPerMonth,
-            countryHint,
-            summary: emailSummary,
-        }).catch((err) => {
-            console.error("Error sending booking email:", err);
-        });
+        if (!teacherEmailSent) {
+            teacherEmailSent = await sendBookingEmail({
+                recipientEmail: (contactSettings?.email || "").trim(),
+                name,
+                email,
+                phone,
+                notes: combinedNotes,
+                slot,
+                studentTimeZone,
+                studentLocale,
+                teacherTimeZone: bookingSettings.timezone || getLocalTimezone() || "",
+                reasons: reason,
+                level,
+                lessonsPerMonth,
+                countryHint,
+                summary: emailSummary,
+            });
+            if (!teacherEmailSent && !teacherEmailError) {
+                teacherEmailError = "Fallback teacher email via EmailJS failed.";
+            }
+        }
 
         if (bookingMsg) {
-            bookingMsg.textContent = studentEmailSent
-                ? "Booked! A confirmation email has been sent."
-                : "Booked successfully.";
+            if (teacherEmailSent && studentEmailSent) {
+                bookingMsg.textContent = "Booked! Teacher and student emails were sent.";
+            } else if (teacherEmailSent) {
+                bookingMsg.textContent = "Booked! The teacher email was sent.";
+            } else if (studentEmailSent) {
+                bookingMsg.textContent = "Booked! A confirmation email was sent.";
+            } else if (appsScriptMessage) {
+                const details = [teacherEmailError, studentEmailError, appsScriptMessage].filter(Boolean).join(" | ");
+                bookingMsg.textContent = `Booked successfully, but email sending did not complete: ${details}`;
+            } else {
+                bookingMsg.textContent = "Booked successfully, but no email confirmation was sent.";
+            }
         }
         if (bookingSuccessModal && bookingSuccessText) {
             const tz = bookingSettings.timezone || getLocalTimezone() || "Local time";
-            bookingSuccessText.textContent = studentEmailSent
-                ? `Your lesson is confirmed for ${slot}. Timezone: ${tz}. A confirmation email was sent to your inbox.`
-                : `Your lesson is confirmed for ${slot}. Timezone: ${tz}.`;
+            const emailStatus = teacherEmailSent && studentEmailSent
+                ? " Teacher and student emails were sent."
+                : teacherEmailSent
+                    ? " The teacher email was sent."
+                    : studentEmailSent
+                        ? " A confirmation email was sent to your inbox."
+                        : appsScriptMessage
+                            ? ` Email sending did not complete: ${[teacherEmailError, studentEmailError, appsScriptMessage].filter(Boolean).join(" | ")}`
+                            : " No email was sent.";
+            bookingSuccessText.textContent = `Your lesson is confirmed for ${slot}. Timezone: ${tz}.${emailStatus}`;
             bookingSuccessModal.classList.add("modal--open");
         }
         localStorage.setItem("pal_arabic_last_booking_ts", String(Date.now()));

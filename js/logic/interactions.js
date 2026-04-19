@@ -221,6 +221,8 @@ function isMobileDevice() {
     return /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
 }
 
+let pendingWhatsAppTargets = null;
+
 function openWhatsAppWithMessage(message) {
     const webUrl = buildWhatsAppUrl(message);
     const number = extractWhatsAppNumber(contactSettings);
@@ -245,6 +247,15 @@ function openWhatsAppWithMessage(message) {
         toast("If TikTok blocks WhatsApp, open in browser or paste the copied link.");
         fallbackToWeb();
         return;
+    }
+
+    if (isMobileDevice()) {
+        pendingWhatsAppTargets = { appUrl, webUrl };
+        const chooser = document.getElementById("whatsAppChooserModal");
+        if (chooser) {
+            chooser.classList.add("modal--open");
+            return;
+        }
     }
 
     const fallbackTimer = setTimeout(() => {
@@ -281,7 +292,7 @@ async function sendBookingEmail(payload) {
     try {
         if (!window.emailjs || typeof window.emailjs.send !== "function") return;
         const params = {
-            to_email: (contactSettings.email || "farouqmurtaja96@gmail.com").trim(),
+            to_email: (payload.recipientEmail || contactSettings.email || "farouqmurtaja96@gmail.com").trim(),
             student_name: payload.name,
             student_email: payload.email,
             student_phone: payload.phone,
@@ -298,9 +309,10 @@ async function sendBookingEmail(payload) {
         };
         await window.emailjs.send("service_977rmzv", "template_419nlgt", params);
         console.log("Booking email sent successfully");
+        return true;
     } catch (err) {
         console.error("Error sending booking email:", err);
-        // Don't throw - email failure shouldn't block booking
+        return false;
     }
 }
 
@@ -6052,20 +6064,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const inputWhatsApp = document.getElementById("contactWhatsApp");
     const inputContactEmail = document.getElementById("contactEmail");
     const inputSitePrice = document.getElementById("contactSitePrice");
-    const contactEmailValue = document.getElementById("contactEmailValue");
-    const contactWhatsAppValue = document.getElementById("contactWhatsAppValue");
-    function renderContactInfo() {
-        if (contactEmailValue) {
-            contactEmailValue.textContent = contactSettings.email || "Email not set yet";
-        }
-        if (contactWhatsAppValue) {
-            contactWhatsAppValue.textContent = contactSettings.whatsapp || "WhatsApp not set yet";
-        }
-    }
     if (inputWhatsApp) inputWhatsApp.value = contactSettings.whatsapp || "";
     if (inputContactEmail) inputContactEmail.value = contactSettings.email || "";
     if (inputSitePrice) inputSitePrice.value = contactSettings.sitePrice || "";
-    renderContactInfo();
     if (btnSaveContact) {
         btnSaveContact.addEventListener("click", async () => {
             contactSettings.whatsapp = inputWhatsApp ? inputWhatsApp.value.trim() : "";
@@ -6073,7 +6074,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             contactSettings.sitePrice = inputSitePrice ? inputSitePrice.value.trim() : "";
             saveContactSettings();
             await saveContactSettingsToCloud();
-            renderContactInfo();
             if (contactSaveMsg) contactSaveMsg.textContent = "Saved.";
             setTimeout(() => {
                 if (contactSaveMsg) contactSaveMsg.textContent = "";
@@ -7084,6 +7084,45 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (bookingSuccessModal) bookingSuccessModal.classList.remove("modal--open");
         });
     });
+    document.querySelectorAll("[data-close-whatsapp-chooser]").forEach((el) => {
+        el.addEventListener("click", () => {
+            const chooser = document.getElementById("whatsAppChooserModal");
+            if (chooser) chooser.classList.remove("modal--open");
+        });
+    });
+    const whatsappAppBtn = document.getElementById("openWhatsAppAppBtn");
+    if (whatsappAppBtn) {
+        whatsappAppBtn.addEventListener("click", () => {
+            const chooser = document.getElementById("whatsAppChooserModal");
+            if (chooser) chooser.classList.remove("modal--open");
+            if (pendingWhatsAppTargets?.appUrl) {
+                window.location.assign(pendingWhatsAppTargets.appUrl);
+            }
+        });
+    }
+    const whatsappWebBtn = document.getElementById("openWhatsAppWebBtn");
+    if (whatsappWebBtn) {
+        whatsappWebBtn.addEventListener("click", () => {
+            const chooser = document.getElementById("whatsAppChooserModal");
+            if (chooser) chooser.classList.remove("modal--open");
+            if (pendingWhatsAppTargets?.webUrl) {
+                window.location.assign(pendingWhatsAppTargets.webUrl);
+            }
+        });
+    }
+    const whatsappCopyBtn = document.getElementById("copyWhatsAppLinkBtn");
+    if (whatsappCopyBtn) {
+        whatsappCopyBtn.addEventListener("click", async () => {
+            if (pendingWhatsAppTargets?.webUrl) {
+                try {
+                    await navigator.clipboard?.writeText(pendingWhatsAppTargets.webUrl);
+                    toast("WhatsApp link copied.");
+                } catch {
+                    toast("Could not copy the WhatsApp link.");
+                }
+            }
+        });
+    }
 
     if (subscribeBookingBtn) {
         subscribeBookingBtn.addEventListener("click", () => {

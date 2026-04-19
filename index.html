@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <title>Palestinian Arabic – Local LMS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; script-src-elem 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://www.google.com https://firestore.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://content.googleapis.com https://script.google.com https://script.googleusercontent.com; frame-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://palestinian-arabic-lab.firebaseapp.com; child-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://palestinian-arabic-lab.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; script-src-elem 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://www.google.com https://firestore.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://content.googleapis.com https://script.google.com https://script.googleusercontent.com https://api.emailjs.com; frame-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://palestinian-arabic-lab.firebaseapp.com; child-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://palestinian-arabic-lab.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111827'/%3E%3Ctext x='32' y='42' font-size='28' text-anchor='middle' fill='%23f8fafc' font-family='Arial, sans-serif'%3EPA%3C/text%3E%3C/svg%3E" />
     
@@ -822,6 +822,19 @@
             </div>
         </div>
     </div>
+    <div id="whatsAppChooserModal" class="modal">
+        <div class="modal__backdrop" data-close-whatsapp-chooser></div>
+        <div class="modal__body">
+            <button class="modal__close" data-close-whatsapp-chooser>&times;</button>
+            <h3 style="margin-bottom:8px;">Open WhatsApp</h3>
+            <p class="small-note">Choose how you want to continue.</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                <button id="openWhatsAppAppBtn" class="btn btn--primary btn--sm" type="button">WhatsApp App</button>
+                <button id="openWhatsAppWebBtn" class="btn btn--outline btn--sm" type="button">Browser / Web</button>
+                <button id="copyWhatsAppLinkBtn" class="btn btn--ghost btn--sm" type="button">Copy Link</button>
+            </div>
+        </div>
+    </div>
     <button id="floatingChatBtn" class="floating-chat-btn" type="button" aria-label="Chat on WhatsApp">Chat on WhatsApp</button>
 
     <!-- =================== MICRO-CHECK MODAL =================== -->
@@ -1019,18 +1032,6 @@
                     <div class="upgrade-actions" style="margin-top:8px;">
                         <button id="trialContactBtn" class="btn btn--ghost btn--sm">Contact on WhatsApp</button>
                         <button id="trialEmailBtn" class="btn btn--outline btn--sm">Contact by Email</button>
-                    </div>
-                    <div class="subscribe-card booking-status-card" style="margin-top:12px;">
-                        <h4>Contact Details</h4>
-                        <p class="small-note">Use WhatsApp or email if you want to ask before booking.</p>
-                        <div class="booking-status-item">
-                            <div><strong>WhatsApp</strong></div>
-                            <div id="contactWhatsAppValue">WhatsApp not set yet</div>
-                        </div>
-                        <div class="booking-status-item">
-                            <div><strong>Email</strong></div>
-                            <div id="contactEmailValue">Email not set yet</div>
-                        </div>
                     </div>
                     <p class="small-note" style="margin-top:8px;">After booking, the teacher gets an email notification and you may receive a confirmation email too.</p>
                 </div>

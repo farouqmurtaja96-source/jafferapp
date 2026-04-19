@@ -183,6 +183,8 @@ function handleRequest_(e) {
       const event = cal.createEvent('Lesson with ' + name, start, end, { description: description });
       var notificationSent = false;
       var studentConfirmationSent = false;
+      var notificationError = '';
+      var studentConfirmationError = '';
       var slotLabel = Utilities.formatDate(start, timeZone, 'yyyy-MM-dd HH:mm');
       try {
         notificationSent = sendBookingNotificationEmail_(teacherEmail, {
@@ -194,7 +196,12 @@ function handleRequest_(e) {
           timeZone: timeZone,
           slotLabel: slotLabel
         });
-      } catch (mailErr) {}
+        if (!notificationSent) {
+          notificationError = teacherEmail ? 'Teacher notification email was not accepted.' : 'Teacher email is missing.';
+        }
+      } catch (mailErr) {
+        notificationError = mailErr && mailErr.message ? mailErr.message : String(mailErr);
+      }
       try {
         studentConfirmationSent = sendStudentConfirmationEmail_(email, {
           name: name,
@@ -202,13 +209,20 @@ function handleRequest_(e) {
           timeZone: timeZone,
           slotLabel: slotLabel
         });
-      } catch (mailErr) {}
+        if (!studentConfirmationSent) {
+          studentConfirmationError = email ? 'Student confirmation email was not accepted.' : 'Student email is missing.';
+        }
+      } catch (mailErr) {
+        studentConfirmationError = mailErr && mailErr.message ? mailErr.message : String(mailErr);
+      }
       return jsonOut({
         success: true,
         message: 'Booking added to Google Calendar.',
         eventId: event.getId(),
         notificationSent: notificationSent,
         studentConfirmationSent: studentConfirmationSent,
+        notificationError: notificationError,
+        studentConfirmationError: studentConfirmationError,
       });
     }
 
