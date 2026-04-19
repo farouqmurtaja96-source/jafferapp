@@ -53,10 +53,7 @@ service cloud.firestore {
         request.resource.data.keys().hasOnly(['email', 'role', 'createdAt', 'createdBy']) &&
         isValidEmail(request.resource.data.email) &&
         request.resource.data.email == authEmail() &&
-        (
-          request.resource.data.role == "student" ||
-          request.resource.data.role == "teacher"
-        );
+        request.resource.data.role == "student";
 
       allow update: if ownsDoc(uid) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email']) &&

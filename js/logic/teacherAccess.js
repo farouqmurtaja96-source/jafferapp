@@ -38,23 +38,9 @@ export async function ensureTeacherUserDoc({ db, firebase, uid, email }) {
         const snap = await ref.get();
         if (snap.exists) {
             const currentData = snap.data() || {};
-            if (currentData.role === "teacher") return true;
-            await ref.set(
-                {
-                    email: email || "",
-                    role: "teacher",
-                },
-                { merge: true }
-            );
-            return true;
+            return currentData.role === "teacher";
         }
-        await ref.set({
-            email: email || "",
-            role: "teacher",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: uid,
-        });
-        return true;
+        return false;
     } catch (err) {
         if (err?.code !== "permission-denied" && err?.code !== "firestore/permission-denied") {
             console.warn("Could not ensure teacher user doc.", err);

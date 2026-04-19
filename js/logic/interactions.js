@@ -7575,11 +7575,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     cred = await auth.signInWithEmailAndPassword(email, password);
                 } catch (err) {
                     if (err.code === "auth/user-not-found") {
-                        // أول مرة → ننشئ حساب مدرس
                         if (errorBox) {
-	                            errorBox.textContent = "";
-	                        }
-	                        cred = await auth.createUserWithEmailAndPassword(email, password);
+                            errorBox.textContent = "Teacher account must be created in Firebase first.";
+                        }
+                        return;
                     } else {
                         throw err;
                     }
@@ -7619,6 +7618,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 	            let finalRole = resolvedRole;
 	            if (role === "teacher") {
+	                if (resolvedRole !== "teacher") {
+	                    await auth.signOut();
+	                    if (errorBox) errorBox.textContent = "This account is not approved as a teacher.";
+	                    return;
+	                }
 	                await bootstrapTeacherAccess({ db, firebase, uid: cred.user.uid, email: cred.user.email });
 	                finalRole = "teacher";
 	            }
