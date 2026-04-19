@@ -374,6 +374,53 @@ function normalizePhone(input) {
     return s.replace(/[^\d+]/g, "");
 }
 
+function getSelectedPhoneDialCode() {
+    const countrySelect = document.getElementById("bookingPhoneCountry");
+    if (!countrySelect) return "";
+    const selectedOption = countrySelect.options[countrySelect.selectedIndex];
+    return selectedOption?.dataset?.dial || "";
+}
+
+function buildBookingPhoneValue(phoneRaw) {
+    const normalized = normalizePhone(phoneRaw);
+    if (!normalized) return "";
+    if (normalized.startsWith("+")) return normalized;
+    const dialCode = getSelectedPhoneDialCode();
+    return `${dialCode}${normalized.replace(/^0+/, "")}`;
+}
+
+function getPreferredPhoneCountryCode() {
+    try {
+        const locale = navigator.language || "";
+        const region = locale.includes("-") ? locale.split("-").pop().toUpperCase() : "";
+        if (region) return region;
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+        if (timeZone.includes("Cairo")) return "EG";
+        if (timeZone.includes("Jerusalem") || timeZone.includes("Gaza")) return "PS";
+        if (timeZone.includes("Amman")) return "JO";
+        if (timeZone.includes("Riyadh")) return "SA";
+        if (timeZone.includes("Dubai")) return "AE";
+    } catch {}
+    return "EG";
+}
+
+function setupBookingPhoneField() {
+    const countrySelect = document.getElementById("bookingPhoneCountry");
+    const phoneInput = document.getElementById("bookingPhone");
+    if (!countrySelect || !phoneInput) return;
+    const preferred = getPreferredPhoneCountryCode();
+    const matchingOption = Array.from(countrySelect.options).find((option) => option.value === preferred);
+    if (matchingOption) {
+        countrySelect.value = preferred;
+    }
+    const updatePlaceholder = () => {
+        const dialCode = getSelectedPhoneDialCode();
+        phoneInput.placeholder = dialCode ? `Mobile number (${dialCode})` : "Mobile number";
+    };
+    countrySelect.addEventListener("change", updatePlaceholder);
+    updatePlaceholder();
+}
+
 function isValidEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "");
 }
@@ -6766,6 +6813,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     buildBookingSelects();
+    setupBookingPhoneField();
     enableBookingGridDrag();
     try { window.buildBookingSelects = buildBookingSelects; } catch { }
 
@@ -6800,9 +6848,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             const selectedTime = window.selectedTime;
             const name = (document.getElementById("bookingName").value || "").trim().slice(0, 100);
             const email = (document.getElementById("bookingEmail").value || "").trim().toLowerCase().slice(0, 200);
-            const phoneRaw = (document.getElementById("bookingPhone").value || "").trim();
-            const phone = normalizePhone(phoneRaw);
-            const notes = (document.getElementById("bookingNotes").value || "").trim().slice(0, 1000);
+            const phoneRaw = (document.getElementById("bookingPhone")?.value || "").trim();
+            const phone = buildBookingPhoneValue(phoneRaw);
+            const notes = (document.getElementById("bookingNotes")?.value || "").trim().slice(0, 1000);
             const reasonLabels = getBookingReasonLabels();
             const reason = reasonLabels.join(", ");
             const level = (document.getElementById("bookingLevel")?.value || "").trim().slice(0, 100);

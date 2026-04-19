@@ -959,7 +959,7 @@
                 </div>
                 <div class="subscribe-card">
                     <h4>Your Details</h4>
-                    <p class="small-note">Only name, email, and phone are required. The rest is optional.</p>
+                    <p class="small-note">Enter your name, email, and mobile number to book quickly.</p>
                     <form id="bookingForm" class="upgrade-form">
                         <input type="hidden" id="bookingWebsite" autocomplete="off" />
                         <div class="form-field">
@@ -972,42 +972,28 @@
                         </div>
                         <div class="form-field">
                             <label>Mobile / WhatsApp *</label>
-                            <input type="text" id="bookingPhone" required placeholder="Enter your phone number" />
-                        </div>
-                        <div class="form-field">
-                            <label>Why do you want to learn Arabic?</label>
-                            <div id="bookingReasonGroup" class="goal-options">
-                                <label class="goal-chip"><input type="checkbox" value="travel" /> For Travel</label>
-                                <label class="goal-chip"><input type="checkbox" value="study" /> For Study</label>
-                                <label class="goal-chip"><input type="checkbox" value="work" /> For Work</label>
-                                <label class="goal-chip"><input type="checkbox" value="family" /> Family Communication</label>
-                                <label class="goal-chip"><input type="checkbox" value="fun" /> For Fun</label>
-                                <label class="goal-chip"><input type="checkbox" value="other" /> Other</label>
+                            <div class="booking-phone-row">
+                                <select id="bookingPhoneCountry" aria-label="Country code">
+                                    <option value="PS" data-dial="+970">Palestine (+970)</option>
+                                    <option value="JO" data-dial="+962">Jordan (+962)</option>
+                                    <option value="EG" data-dial="+20">Egypt (+20)</option>
+                                    <option value="SA" data-dial="+966">Saudi Arabia (+966)</option>
+                                    <option value="AE" data-dial="+971">UAE (+971)</option>
+                                    <option value="QA" data-dial="+974">Qatar (+974)</option>
+                                    <option value="KW" data-dial="+965">Kuwait (+965)</option>
+                                    <option value="BH" data-dial="+973">Bahrain (+973)</option>
+                                    <option value="OM" data-dial="+968">Oman (+968)</option>
+                                    <option value="LB" data-dial="+961">Lebanon (+961)</option>
+                                    <option value="SY" data-dial="+963">Syria (+963)</option>
+                                    <option value="TR" data-dial="+90">Turkey (+90)</option>
+                                    <option value="DE" data-dial="+49">Germany (+49)</option>
+                                    <option value="FR" data-dial="+33">France (+33)</option>
+                                    <option value="GB" data-dial="+44">United Kingdom (+44)</option>
+                                    <option value="US" data-dial="+1">United States (+1)</option>
+                                    <option value="CA" data-dial="+1">Canada (+1)</option>
+                                </select>
+                                <input type="tel" id="bookingPhone" required placeholder="Mobile number" inputmode="tel" autocomplete="tel-national" />
                             </div>
-                        </div>
-                        <div class="form-field">
-                            <label>What is your current Arabic level?</label>
-                            <select id="bookingLevel">
-                                <option value="">Select level</option>
-                                <option value="beginner">Beginner</option>
-                                <option value="pre-intermediate">Pre-Intermediate</option>
-                                <option value="intermediate">Intermediate</option>
-                            </select>
-                        </div>
-                        <div class="form-field">
-                            <label>How many lessons per month?</label>
-                            <select id="bookingLessonsPerMonth">
-                                <option value="">Select number</option>
-                                <option value="4">4 lessons</option>
-                                <option value="8">8 lessons</option>
-                                <option value="12">12 lessons</option>
-                                <option value="16">16 lessons</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div class="form-field">
-                            <label>Notes (optional)</label>
-                            <input type="text" id="bookingNotes" placeholder="Any additional information" />
                         </div>
                         <div class="form-field">
                             <div class="g-recaptcha" data-sitekey="6LcLRrcsAAAAALQlPoVFVTbOuGPoqvKaCiniUMfV"></div>

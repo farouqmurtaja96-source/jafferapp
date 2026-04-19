@@ -805,6 +805,23 @@ body.home-only main {
     gap: 8px;
 }
 
+.booking-phone-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 190px) minmax(0, 1fr);
+    gap: 10px;
+}
+
+.booking-phone-row select,
+.booking-phone-row input {
+    width: 100%;
+}
+
+@media (max-width: 600px) {
+    .booking-phone-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .btn__spinner {
     width: 16px;
     height: 16px;
