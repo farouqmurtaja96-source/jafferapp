@@ -613,11 +613,14 @@ function updateAuthUI() {
 }
 
 // =============== AUTH STATE LISTENER =================
-auth.onAuthStateChanged(async (user) => {
-    if (!user) {
-        appState.currentUser = null;
-        updateAuthUI();
-        try { window.refreshGoogleCalendarStatus?.(); } catch { }
+	auth.onAuthStateChanged(async (user) => {
+	    if (!user) {
+	        appState.currentUser = null;
+	        appState.students = [];
+	        appState.currentStudentId = null;
+	        try { window.preplyCalendarId = null; } catch {}
+	        updateAuthUI();
+	        try { window.refreshGoogleCalendarStatus?.(); } catch { }
         // رجّعيه للصفحة الرئيسية
         showScreen("home-screen");
         return;
@@ -640,11 +643,16 @@ auth.onAuthStateChanged(async (user) => {
             fallbackRole: null,
         });
 
-        appState.currentUser = {
-            uid: user.uid,
-            email: user.email,
-            role,
-        };
+	        appState.currentUser = {
+	            uid: user.uid,
+	            email: user.email,
+	            role,
+	        };
+	        if (role === "teacher") {
+	            appState.students = [];
+	            appState.currentStudentId = null;
+	            try { window.preplyCalendarId = null; } catch {}
+	        }
 
         // نحدّث الـ localStorage بالدور النهائي
         try {
@@ -2552,7 +2560,7 @@ async function saveStudentsToCloud() {
 }
 
 function saveStudentsToLS({ skipCloud = false } = {}) {
-    localStorage.setItem(LS_STUDENTS_KEY, JSON.stringify(appState.students));
+    localStorage.setItem(getStudentsStorageKey(), JSON.stringify(appState.students));
     if (!skipCloud) scheduleCloudSave();
 }
 
@@ -2588,11 +2596,16 @@ async function syncTeacherStudentsFromCloud() {
 
 function loadStudentsFromLS() {
     try {
-        const raw = localStorage.getItem(LS_STUDENTS_KEY);
+        const raw = localStorage.getItem(getStudentsStorageKey());
         return raw ? JSON.parse(raw) : [];
     } catch {
         return [];
     }
+}
+
+function getStudentsStorageKey() {
+    const uid = appState.currentUser?.uid || "anonymous";
+    return `${LS_STUDENTS_KEY}:${uid}`;
 }
 
 function ensureStudentProgress(student, lessonId) {
@@ -6247,6 +6260,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                     preplyCalendarIdInput.value = teacherData.preplyCalendarId || teacherData.googleCalendar?.preplyCalendarId || "";
                     if (appsScriptWebAppUrl) appsScriptWebAppUrl.value = teacherData.appsScript?.webAppUrl || "";
                 } catch {}
+            } else {
+                if (preplyCalendarIdInput) preplyCalendarIdInput.value = "";
+                if (appsScriptWebAppUrl) appsScriptWebAppUrl.value = "";
             }
             if (isConnected) startCalendarAutoSync();
             else stopCalendarAutoSync();
