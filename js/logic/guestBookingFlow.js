@@ -155,9 +155,11 @@ export async function submitGuestBooking({
         let googleCalendarEventId = null;
         let teacherEmailSent = false;
         let studentEmailSent = false;
+        let studentCalendarInviteSent = false;
         let appsScriptMessage = "";
         let teacherEmailError = "";
         let studentEmailError = "";
+        let studentCalendarInviteError = "";
         const appsScriptSync = await createBookingViaAppsScript?.({
             bookingId: bookingRef.id,
             slot: selectedSlot,
@@ -176,8 +178,10 @@ export async function submitGuestBooking({
             googleCalendarEventId = appsScriptSync.eventId || null;
             teacherEmailSent = !!appsScriptSync.notificationSent;
             studentEmailSent = !!appsScriptSync.studentConfirmationSent;
+            studentCalendarInviteSent = !!appsScriptSync.calendarInviteSent;
             teacherEmailError = appsScriptSync.notificationError || "";
             studentEmailError = appsScriptSync.studentConfirmationError || "";
+            studentCalendarInviteError = appsScriptSync.calendarInviteError || "";
             appsScriptMessage = appsScriptSync.message || "";
         } else {
             appsScriptMessage = appsScriptSync?.message || "";
@@ -282,14 +286,18 @@ export async function submitGuestBooking({
         }
 
         if (bookingMsg) {
-            if (teacherEmailSent && studentEmailSent) {
-                bookingMsg.textContent = "Booked! Teacher and student emails were sent.";
+            if (teacherEmailSent && (studentEmailSent || studentCalendarInviteSent)) {
+                bookingMsg.textContent = studentEmailSent
+                    ? "Booked! Teacher and student emails were sent."
+                    : "Booked! The teacher email was sent and the student got a calendar invite.";
             } else if (teacherEmailSent) {
                 bookingMsg.textContent = "Booked! The teacher email was sent.";
-            } else if (studentEmailSent) {
-                bookingMsg.textContent = "Booked! A confirmation email was sent.";
+            } else if (studentEmailSent || studentCalendarInviteSent) {
+                bookingMsg.textContent = studentEmailSent
+                    ? "Booked! A confirmation email was sent."
+                    : "Booked! A calendar invite was sent to the student.";
             } else if (appsScriptMessage) {
-                const details = [teacherEmailError, studentEmailError, appsScriptMessage].filter(Boolean).join(" | ");
+                const details = [teacherEmailError, studentEmailError, studentCalendarInviteError, appsScriptMessage].filter(Boolean).join(" | ");
                 bookingMsg.textContent = `Booked successfully, but email sending did not complete: ${details}`;
             } else {
                 bookingMsg.textContent = "Booked successfully, but no email confirmation was sent.";
@@ -297,14 +305,16 @@ export async function submitGuestBooking({
         }
         if (bookingSuccessModal && bookingSuccessText) {
             const tz = bookingSettings.timezone || getLocalTimezone() || "Local time";
-            const emailStatus = teacherEmailSent && studentEmailSent
-                ? " Teacher and student emails were sent."
+            const emailStatus = teacherEmailSent && (studentEmailSent || studentCalendarInviteSent)
+                ? studentEmailSent
+                    ? " Teacher and student emails were sent."
+                    : " The teacher email was sent and the student got a calendar invite."
                 : teacherEmailSent
                     ? " The teacher email was sent."
-                    : studentEmailSent
+                    : (studentEmailSent || studentCalendarInviteSent)
                         ? " A confirmation email was sent to your inbox."
                         : appsScriptMessage
-                            ? ` Email sending did not complete: ${[teacherEmailError, studentEmailError, appsScriptMessage].filter(Boolean).join(" | ")}`
+                            ? ` Email sending did not complete: ${[teacherEmailError, studentEmailError, studentCalendarInviteError, appsScriptMessage].filter(Boolean).join(" | ")}`
                             : " No email was sent.";
             bookingSuccessText.textContent = `Your lesson is confirmed for ${slot}. Timezone: ${tz}.${emailStatus}`;
             bookingSuccessModal.classList.add("modal--open");

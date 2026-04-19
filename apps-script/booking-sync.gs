@@ -19,6 +19,10 @@ function normalizeEmail_(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function isValidEmail_(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail_(value));
+}
+
 function sendPlainEmail_(recipient, subject, body) {
   const email = normalizeEmail_(recipient);
   if (!email) return false;
@@ -181,6 +185,18 @@ function handleRequest_(e) {
         'Timezone: ' + timeZone
       ].join('\n');
       const event = cal.createEvent('Lesson with ' + name, start, end, { description: description });
+      var calendarInviteSent = false;
+      var calendarInviteError = '';
+      try {
+        if (isValidEmail_(email)) {
+          event.addGuest(normalizeEmail_(email));
+          calendarInviteSent = true;
+        } else {
+          calendarInviteError = 'Student email is invalid for calendar invite.';
+        }
+      } catch (guestErr) {
+        calendarInviteError = guestErr && guestErr.message ? guestErr.message : String(guestErr);
+      }
       var notificationSent = false;
       var studentConfirmationSent = false;
       var notificationError = '';
@@ -219,6 +235,8 @@ function handleRequest_(e) {
         success: true,
         message: 'Booking added to Google Calendar.',
         eventId: event.getId(),
+        calendarInviteSent: calendarInviteSent,
+        calendarInviteError: calendarInviteError,
         notificationSent: notificationSent,
         studentConfirmationSent: studentConfirmationSent,
         notificationError: notificationError,
