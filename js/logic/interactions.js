@@ -7603,17 +7603,25 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
 
             // نقرأ بيانات المستخدم من Firestore
-            const { role: finalRole } = await resolveUserRole({
-                db,
-                uid: cred.user.uid,
-                email: cred.user.email,
-                savedRole: null,
-                fallbackRole: role,
-            });
+	            const { role: resolvedRole } = await resolveUserRole({
+	                db,
+	                uid: cred.user.uid,
+	                email: cred.user.email,
+	                savedRole: null,
+	                fallbackRole: role,
+	            });
 
-            if (finalRole === "teacher") {
-                await bootstrapTeacherAccess({ db, firebase, uid: cred.user.uid, email: cred.user.email });
-            }
+	            if (role === "student" && resolvedRole === "teacher") {
+	                await auth.signOut();
+	                if (errorBox) errorBox.textContent = "This email belongs to a teacher account. Please sign in as Teacher.";
+	                return;
+	            }
+
+	            let finalRole = resolvedRole;
+	            if (role === "teacher") {
+	                await bootstrapTeacherAccess({ db, firebase, uid: cred.user.uid, email: cred.user.email });
+	                finalRole = "teacher";
+	            }
 
             appState.currentUser = {
                 uid: cred.user.uid,
