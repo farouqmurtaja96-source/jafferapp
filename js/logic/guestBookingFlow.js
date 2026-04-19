@@ -259,6 +259,27 @@ export async function submitGuestBooking({
                 teacherEmailError = "Fallback teacher email via EmailJS failed.";
             }
         }
+        if (!studentEmailSent) {
+            studentEmailSent = await sendBookingEmail({
+                recipientEmail: email,
+                name,
+                email,
+                phone,
+                notes: `Your lesson has been booked successfully.\nBooking time: ${slot}\nTeacher timezone: ${bookingSettings.timezone || getLocalTimezone() || ""}\nBooking ID: ${bookingRef.id}`,
+                slot,
+                studentTimeZone,
+                studentLocale,
+                teacherTimeZone: bookingSettings.timezone || getLocalTimezone() || "",
+                reasons: "",
+                level: "",
+                lessonsPerMonth: "",
+                countryHint,
+                summary: `Booking confirmed for ${name} at ${slot}.`,
+            });
+            if (!studentEmailSent && !studentEmailError) {
+                studentEmailError = "Fallback student email via EmailJS failed.";
+            }
+        }
 
         if (bookingMsg) {
             if (teacherEmailSent && studentEmailSent) {
