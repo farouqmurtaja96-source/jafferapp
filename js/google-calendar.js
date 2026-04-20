@@ -6,6 +6,21 @@ let gisInited = false;
 let accessToken = null;
 let refreshToken = null;
 let calendarId = 'primary';
+const errorHandler = {
+    withTimeout(asyncFn, timeoutMs = 10000, timeoutMessage = "Google Calendar initialization timed out.") {
+        if (window.errorHandler?.withTimeout) {
+            return window.errorHandler.withTimeout(asyncFn, timeoutMs, timeoutMessage);
+        }
+        const task = typeof asyncFn === "function" ? asyncFn() : asyncFn;
+        return Promise.race([
+            Promise.resolve(task),
+            new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)),
+        ]);
+    },
+    handleError(error, context) {
+        window.errorHandler?.handleError?.(error, context);
+    },
+};
 window.preplyCalendarId = null; // Will be set from Firebase or user input
 
 function normalizeCalendarId(value) {
