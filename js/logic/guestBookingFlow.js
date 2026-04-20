@@ -157,6 +157,7 @@ export async function submitGuestBooking({
         let studentEmailSent = false;
         let studentCalendarInviteSent = false;
         let appsScriptMessage = "";
+        let appsScriptSucceeded = false;
         let teacherEmailError = "";
         let studentEmailError = "";
         let studentCalendarInviteError = "";
@@ -174,6 +175,7 @@ export async function submitGuestBooking({
             studentLocale,
         });
         if (appsScriptSync?.success) {
+            appsScriptSucceeded = true;
             calendarSynced = true;
             googleCalendarEventId = appsScriptSync.eventId || null;
             teacherEmailSent = !!appsScriptSync.notificationSent;
@@ -242,7 +244,7 @@ export async function submitGuestBooking({
             notes ? `Notes: ${notes}` : "",
         ].filter(Boolean).join("\n");
 
-        if (!teacherEmailSent) {
+        if (!teacherEmailSent && !appsScriptSucceeded) {
             teacherEmailSent = await sendBookingEmail({
                 recipientEmail: (contactSettings?.email || "").trim(),
                 name,
@@ -263,7 +265,7 @@ export async function submitGuestBooking({
                 teacherEmailError = "Fallback teacher email via EmailJS failed.";
             }
         }
-        if (!studentEmailSent) {
+        if (!studentEmailSent && !appsScriptSucceeded) {
             studentEmailSent = await sendBookingEmail({
                 recipientEmail: email,
                 name,
