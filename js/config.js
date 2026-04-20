@@ -14,6 +14,12 @@ window.googleCalendarConfig = {
         appConfig.googleCalendar?.redirectUri || window.location.origin + "/",
 };
 
+window.emailJsConfig = {
+    publicKey: appConfig.emailjs?.publicKey || "",
+    serviceId: appConfig.emailjs?.serviceId || "",
+    templateId: appConfig.emailjs?.templateId || "",
+};
+
 if (!window.__APP_CONFIG__) {
     console.warn(
         "Runtime app config is missing. Create js/config.runtime.js locally or inject it during deployment."

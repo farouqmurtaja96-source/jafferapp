@@ -41,6 +41,7 @@ const state = {
     runtimeBusyBlocks: [],
     selectedSlotMs: null,
     selectedDateKey: "",
+    visibleDateKey: "",
     bookingWeekOffset: 0,
     teacherUser: null,
     teacherRole: "",
@@ -147,6 +148,46 @@ function isLocalDevHost() {
     return host === "localhost" || host === "127.0.0.1" || host === "";
 }
 
+function ensureEmailJsInit() {
+    const cfg = window.emailJsConfig || {};
+    if (!cfg.publicKey) return false;
+    try {
+        if (window.emailjs && typeof window.emailjs.init === "function") {
+            window.emailjs.init(cfg.publicKey);
+            return true;
+        }
+    } catch {}
+    return false;
+}
+
+async function sendBookingEmail(payload) {
+    const cfg = window.emailJsConfig || {};
+    if (!cfg.publicKey || !cfg.serviceId || !cfg.templateId) return false;
+    if (!ensureEmailJsInit()) return false;
+
+    try {
+        await window.emailjs.send(cfg.serviceId, cfg.templateId, {
+            to_email: (payload.recipientEmail || "").trim(),
+            student_name: payload.name || "",
+            student_email: payload.email || "",
+            student_phone: payload.phone || "",
+            slot_time: payload.slot || "",
+            notes: payload.notes || "",
+            student_timezone: payload.studentTimeZone || "",
+            student_locale: payload.studentLocale || "",
+            teacher_timezone: payload.teacherTimeZone || "",
+            booking_reasons: payload.reasons || "",
+            booking_level: payload.level || "",
+            booking_lessons_per_month: payload.lessonsPerMonth || "",
+            booking_country_hint: payload.countryHint || "",
+            booking_summary: payload.summary || "",
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 function setStatus(element, message, tone = "") {
     if (!element) return;
     element.textContent = message || "";
@@ -208,6 +249,7 @@ function setSelectedSlot(slotMs) {
     state.selectedSlotMs = slotMs;
     const slotDate = slotMs ? new Date(slotMs) : null;
     state.selectedDateKey = slotDate ? getDateKey(slotDate) : "";
+    state.visibleDateKey = state.selectedDateKey || state.visibleDateKey;
     window.selectedDate = slotDate ? getDateKey(slotDate) : "";
     window.selectedTime = slotDate
         ? `${String(slotDate.getHours()).padStart(2, "0")}:${String(slotDate.getMinutes()).padStart(2, "0")}`
@@ -265,9 +307,10 @@ function renderDateChips(days) {
     days.forEach((day) => {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = `date-chip${day.dateKey === state.selectedDateKey ? " is-selected" : ""}`;
+        btn.className = `date-chip${day.dateKey === state.visibleDateKey ? " is-selected" : ""}`;
         btn.textContent = day.label;
         btn.addEventListener("click", () => {
+            state.visibleDateKey = day.dateKey;
             if (!day.firstSlotMs) return;
             setSelectedSlot(day.firstSlotMs);
             renderBookingCalendar().catch(console.error);
@@ -302,6 +345,11 @@ async function renderBookingCalendar() {
         });
     }
 
+    const fallbackVisibleDate = days.find((day) => day.dateKey === state.visibleDateKey)
+        ? state.visibleDateKey
+        : (days.find((day) => day.slots.length)?.dateKey || days[0]?.dateKey || "");
+    state.visibleDateKey = fallbackVisibleDate;
+
     renderDateChips(days);
 
     if (els.bookingWeekLabel) {
@@ -316,7 +364,8 @@ async function renderBookingCalendar() {
 
     days.forEach((day) => {
         const column = document.createElement("div");
-        column.className = `booking-day-column${day.slots.length ? "" : " is-empty"}`;
+        column.className = `booking-day-column${day.slots.length ? "" : " is-empty"}${day.dateKey === state.visibleDateKey ? " is-focused" : ""}`;
+        column.dataset.dateKey = day.dateKey;
         const header = document.createElement("div");
         header.className = "booking-day-header";
         header.innerHTML = `
@@ -344,6 +393,7 @@ async function renderBookingCalendar() {
                     minute: "2-digit",
                 });
                 btn.addEventListener("click", () => {
+                    state.visibleDateKey = day.dateKey;
                     setSelectedSlot(slot.startMs);
                     renderBookingCalendar().catch(console.error);
                 });
@@ -484,7 +534,7 @@ function wireStudentActions() {
             findBookingConflict: (slotMs) => findBookingConflict(slotMs, bookingDeps()),
             buildBookingSelects: renderBookingCalendar,
             hashEmail,
-            sendBookingEmail: async () => false,
+            sendBookingEmail,
             createBookingViaAppsScript: window.createBookingViaAppsScript,
             loadBookingStatus,
             isLocalDevHost,

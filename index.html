@@ -52,8 +52,31 @@
                 </div>
             </div>
 
-            <div class="grid-two">
-                <article class="panel">
+            <section class="student-hero">
+                <div class="student-hero__main">
+                    <p class="student-hero__kicker">Simple Booking Flow</p>
+                    <p class="small-note">
+                        The schedule reflects the teacher's real availability, synced with calendar blocks and manual exceptions.
+                    </p>
+                </div>
+                <div class="student-hero__stats">
+                    <div class="student-stat">
+                        <span class="student-stat__label">Step 1</span>
+                        <strong>Select a slot</strong>
+                    </div>
+                    <div class="student-stat">
+                        <span class="student-stat__label">Step 2</span>
+                        <strong>Fill the form</strong>
+                    </div>
+                    <div class="student-stat">
+                        <span class="student-stat__label">Step 3</span>
+                        <strong>Receive confirmation</strong>
+                    </div>
+                </div>
+            </section>
+
+            <div class="student-layout">
+                <article class="panel panel--schedule">
                     <div class="panel__head">
                         <div>
                             <h3>Available Times</h3>
@@ -78,74 +101,86 @@
                     </div>
                 </article>
 
-                <article class="panel">
-                    <div class="panel__head">
-                        <div>
-                            <h3>Your Details</h3>
-                            <p class="small-note">Fill in your details to reserve the selected slot.</p>
-                        </div>
-                    </div>
-
-                    <form id="bookingForm" class="form-stack">
-                        <input type="hidden" id="bookingWebsite" autocomplete="off" />
-                        <label class="field">
-                            <span>Full Name</span>
-                            <input id="bookingName" type="text" placeholder="Enter your full name" required />
-                        </label>
-                        <label class="field">
-                            <span>Email Address</span>
-                            <input id="bookingEmail" type="email" placeholder="Enter your email" required />
-                        </label>
-                        <label class="field">
-                            <span>Mobile / WhatsApp</span>
-                            <div class="phone-row">
-                                <select id="bookingPhoneCountry" aria-label="Country code">
-                                    <option value="+970">Palestine (+970)</option>
-                                    <option value="+962">Jordan (+962)</option>
-                                    <option value="+20">Egypt (+20)</option>
-                                    <option value="+966">Saudi Arabia (+966)</option>
-                                    <option value="+971">UAE (+971)</option>
-                                    <option value="+974">Qatar (+974)</option>
-                                    <option value="+44">UK (+44)</option>
-                                    <option value="+1">USA / Canada (+1)</option>
-                                </select>
-                                <input id="bookingPhone" type="tel" inputmode="tel" placeholder="Mobile number" required />
+                <div class="student-stack">
+                    <article class="panel panel--form">
+                        <div class="panel__head">
+                            <div>
+                                <h3>Your Details</h3>
+                                <p class="small-note">Fill in your details to reserve the selected slot.</p>
                             </div>
-                        </label>
-                        <label class="field">
-                            <span>Notes</span>
-                            <textarea id="bookingNotes" rows="4" placeholder="Optional message for the teacher"></textarea>
-                        </label>
-                        <div class="field">
-                            <div class="g-recaptcha" data-sitekey="6LcLRrcsAAAAALQlPoVFVTbOuGPoqvKaCiniUMfV"></div>
                         </div>
-                        <button type="submit" class="btn btn--primary btn--full" id="bookingSubmit" disabled>
-                            <span class="btn__label">Book Now</span>
-                            <span class="btn__spinner" aria-hidden="true"></span>
-                        </button>
-                        <p id="bookingMsg" class="status-line"></p>
-                    </form>
 
-                    <div class="divider"></div>
+                        <form id="bookingForm" class="form-stack">
+                            <input type="hidden" id="bookingWebsite" autocomplete="off" />
+                            <div class="form-grid">
+                                <label class="field">
+                                    <span>Full Name</span>
+                                    <input id="bookingName" type="text" placeholder="Enter your full name" required />
+                                </label>
+                                <label class="field">
+                                    <span>Email Address</span>
+                                    <input id="bookingEmail" type="email" placeholder="Enter your email" required />
+                                </label>
+                            </div>
+                            <label class="field">
+                                <span>Mobile / WhatsApp</span>
+                                <div class="phone-row">
+                                    <select id="bookingPhoneCountry" aria-label="Country code">
+                                        <option value="+970">Palestine (+970)</option>
+                                        <option value="+962">Jordan (+962)</option>
+                                        <option value="+20">Egypt (+20)</option>
+                                        <option value="+966">Saudi Arabia (+966)</option>
+                                        <option value="+971">UAE (+971)</option>
+                                        <option value="+974">Qatar (+974)</option>
+                                        <option value="+44">UK (+44)</option>
+                                        <option value="+1">USA / Canada (+1)</option>
+                                    </select>
+                                    <input id="bookingPhone" type="tel" inputmode="tel" placeholder="Mobile number" required />
+                                </div>
+                            </label>
+                            <label class="field">
+                                <span>Notes</span>
+                                <textarea id="bookingNotes" rows="4" placeholder="Optional message for the teacher"></textarea>
+                            </label>
+                            <div class="field">
+                                <div class="g-recaptcha" data-sitekey="6LcLRrcsAAAAALQlPoVFVTbOuGPoqvKaCiniUMfV"></div>
+                            </div>
+                            <button type="submit" class="btn btn--primary btn--full" id="bookingSubmit" disabled>
+                                <span class="btn__label">Book Now</span>
+                                <span class="btn__spinner" aria-hidden="true"></span>
+                            </button>
+                            <p id="bookingMsg" class="status-line"></p>
+                        </form>
+                    </article>
 
-                    <div class="panel__head">
-                        <div>
-                            <h3>Check Booking Status</h3>
-                            <p class="small-note">Use your email to see your recent bookings.</p>
+                    <article class="panel panel--support">
+                        <div class="support-grid">
+                            <div>
+                                <div class="panel__head panel__head--compact">
+                                    <div>
+                                        <h3>Check Booking Status</h3>
+                                        <p class="small-note">Use your email to see your recent bookings.</p>
+                                    </div>
+                                </div>
+                                <div class="status-check">
+                                    <input id="bookingStatusEmail" type="email" placeholder="Enter your email" />
+                                    <button id="bookingStatusBtn" type="button" class="btn btn--outline">Check Status</button>
+                                </div>
+                                <div id="bookingStatusList" class="status-list"></div>
+                                <p id="bookingStatusMsg" class="status-line"></p>
+                            </div>
+
+                            <div class="contact-card">
+                                <h3>Need Help?</h3>
+                                <p class="small-note">Reach the teacher directly if you want to ask before booking.</p>
+                                <div class="action-row action-row--column">
+                                    <button id="contactWhatsAppBtn" type="button" class="btn btn--ghost">Contact on WhatsApp</button>
+                                    <button id="contactEmailBtn" type="button" class="btn btn--outline">Contact by Email</button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="status-check">
-                        <input id="bookingStatusEmail" type="email" placeholder="Enter your email" />
-                        <button id="bookingStatusBtn" type="button" class="btn btn--outline">Check Status</button>
-                    </div>
-                    <div id="bookingStatusList" class="status-list"></div>
-                    <p id="bookingStatusMsg" class="status-line"></p>
-
-                    <div class="action-row">
-                        <button id="contactWhatsAppBtn" type="button" class="btn btn--ghost">Contact on WhatsApp</button>
-                        <button id="contactEmailBtn" type="button" class="btn btn--outline">Contact by Email</button>
-                    </div>
-                </article>
+                    </article>
+                </div>
             </div>
         </section>
 
@@ -159,6 +194,18 @@
                     </p>
                 </div>
             </div>
+
+            <section class="teacher-banner">
+                <div>
+                    <p class="student-hero__kicker">Control Center</p>
+                    <h3>Availability, automation, and bookings in one place.</h3>
+                </div>
+                <div class="teacher-banner__chips">
+                    <span class="teacher-chip">Calendar Sync</span>
+                    <span class="teacher-chip">Apps Script</span>
+                    <span class="teacher-chip">Booking Admin</span>
+                </div>
+            </section>
 
             <div class="teacher-topbar">
                 <div id="teacherAuthBadge" class="auth-badge">Signed out</div>
