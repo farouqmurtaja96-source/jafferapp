@@ -34,6 +34,7 @@ import {
 
 const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_TIMEZONE = "Africa/Cairo";
+const GOOGLE_BUSY_REFRESH_MS = 60000;
 
 const state = {
     bookingSettings: ensureBookingSettingsShape(createInitialBookingSettings()),
@@ -47,6 +48,8 @@ const state = {
     teacherRole: "",
     bookingCache: new Map(),
     googleCalendarMessage: "",
+    busyRefreshTimer: null,
+    busyRefreshInFlight: null,
 };
 
 const els = {};
@@ -279,6 +282,16 @@ function bookingDeps() {
 }
 
 async function refreshRuntimeBusyBlocks() {
+    if (state.busyRefreshInFlight) {
+        return state.busyRefreshInFlight;
+    }
+    state.busyRefreshInFlight = refreshRuntimeBusyBlocksNow().finally(() => {
+        state.busyRefreshInFlight = null;
+    });
+    return state.busyRefreshInFlight;
+}
+
+async function refreshRuntimeBusyBlocksNow() {
     if (typeof window.fetchBusyBlocksFromAppsScript !== "function") {
         state.runtimeBusyBlocks = [];
         return;
@@ -290,6 +303,29 @@ async function refreshRuntimeBusyBlocks() {
     state.runtimeBusyBlocks = result?.success && Array.isArray(result.busyBlocks)
         ? result.busyBlocks
         : [];
+}
+
+async function refreshGoogleBusyAndCalendar({ silent = true } = {}) {
+    await refreshRuntimeBusyBlocks();
+    await renderBookingCalendar();
+    if (!silent) {
+        setStatus(
+            els.bookingMsg,
+            state.runtimeBusyBlocks.length
+                ? "Calendar availability refreshed."
+                : "Calendar availability checked.",
+            "success"
+        );
+    }
+}
+
+function startGoogleBusyAutoRefresh() {
+    if (state.busyRefreshTimer) return;
+    state.busyRefreshTimer = window.setInterval(() => {
+        const studentScreen = document.getElementById("student-screen");
+        if (!studentScreen?.classList.contains("app-screen--active")) return;
+        refreshGoogleBusyAndCalendar().catch(console.error);
+    }, GOOGLE_BUSY_REFRESH_MS);
 }
 
 async function loadPublicSettings() {
@@ -443,12 +479,12 @@ function wireStudentActions() {
 
     els.bookingWeekPrev?.addEventListener("click", () => {
         state.bookingWeekOffset = Math.max(0, state.bookingWeekOffset - 1);
-        renderBookingCalendar().catch(console.error);
+        refreshGoogleBusyAndCalendar().catch(console.error);
     });
 
     els.bookingWeekNext?.addEventListener("click", () => {
         state.bookingWeekOffset += 1;
-        renderBookingCalendar().catch(console.error);
+        refreshGoogleBusyAndCalendar().catch(console.error);
     });
 
     els.bookingStatusBtn?.addEventListener("click", () => {
@@ -531,7 +567,10 @@ function wireStudentActions() {
             bookingSuccessModal: els.bookingSuccessModal,
             bookingSuccessText: els.bookingSuccessText,
             bookingStatusEmail: els.bookingStatusEmail,
-            findBookingConflict: (slotMs) => findBookingConflict(slotMs, bookingDeps()),
+            findBookingConflict: async (slotMs) => {
+                await refreshRuntimeBusyBlocks();
+                return findBookingConflict(slotMs, bookingDeps());
+            },
             buildBookingSelects: renderBookingCalendar,
             hashEmail,
             sendBookingEmail,
@@ -1029,6 +1068,7 @@ async function init() {
 
     await loadPublicSettings();
     await renderBookingCalendar();
+    startGoogleBusyAutoRefresh();
     const lastEmail = (localStorage.getItem("pal_arabic_last_booking_email") || "").trim();
     if (lastEmail && els.bookingStatusEmail) {
         els.bookingStatusEmail.value = lastEmail;

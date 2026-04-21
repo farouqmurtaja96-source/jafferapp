@@ -158,7 +158,7 @@ function handleRequest_(e) {
 
     if (action === 'createBooking') {
       const slot = Number(req.slot || 0);
-      const durationMinutes = Math.max(30, Math.min(180, Number(req.durationMinutes || 50)));
+      const durationMinutes = 50;
       const timeZone = req.timeZone || config.defaultTimeZone;
       const name = req.name || 'Student';
       const email = req.email || '';

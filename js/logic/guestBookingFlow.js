@@ -164,7 +164,7 @@ export async function submitGuestBooking({
         const appsScriptSync = await createBookingViaAppsScript?.({
             bookingId: bookingRef.id,
             slot: selectedSlot,
-            durationMinutes: bookingSettings.slotMinutes || 50,
+            durationMinutes: 50,
             timeZone: bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
             teacherEmail: (contactSettings?.email || "").trim(),
             name,
