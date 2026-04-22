@@ -55,6 +55,9 @@ const state = {
     googleCalendarMessage: "",
     busyRefreshTimer: null,
     busyRefreshInFlight: null,
+    googleCalendarModuleLoading: null,
+    publicSettingsLoaded: false,
+    bookingCalendarLoaded: false,
     busySyncReady: false,
     busySyncMessage: "",
 };
@@ -212,6 +215,38 @@ async function sendBookingEmail(payload) {
     } catch {
         return false;
     }
+}
+
+function loadScriptOnce(src) {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing?.dataset.loaded === "true") return Promise.resolve();
+    if (existing) {
+        return new Promise((resolve, reject) => {
+            existing.addEventListener("load", () => resolve(), { once: true });
+            existing.addEventListener("error", () => reject(new Error(`Could not load ${src}`)), { once: true });
+        });
+    }
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.defer = true;
+        script.addEventListener("load", () => {
+            script.dataset.loaded = "true";
+            resolve();
+        }, { once: true });
+        script.addEventListener("error", () => reject(new Error(`Could not load ${src}`)), { once: true });
+        document.head.appendChild(script);
+    });
+}
+
+async function ensureGoogleCalendarModuleLoaded() {
+    if (window.connectToGoogleCalendar && window.importGoogleCalendarEventsToBusyBlocks) return;
+    if (!state.googleCalendarModuleLoading) {
+        state.googleCalendarModuleLoading = loadScriptOnce("./js/google-calendar.js").finally(() => {
+            state.googleCalendarModuleLoading = null;
+        });
+    }
+    await state.googleCalendarModuleLoading;
 }
 
 function setStatus(element, message, tone = "") {
@@ -470,17 +505,26 @@ function startGoogleBusyAutoRefresh() {
     state.busyRefreshTimer = window.setInterval(() => {
         const studentScreen = document.getElementById("student-screen");
         if (!studentScreen?.classList.contains("app-screen--active")) return;
-        refreshGoogleBusyAndCalendar().catch(console.error);
+        ensureBookingCalendarLoaded({ force: true }).catch(console.error);
     }, GOOGLE_BUSY_REFRESH_MS);
 }
 
 async function loadPublicSettings() {
+    if (state.publicSettingsLoaded) return;
     state.bookingSettings = ensureBookingSettingsShape(
         await loadBookingSettingsFromCloud(window.db, getDefaultBookingSettings(getLocalTimezone()))
     );
     state.contactSettings = await loadContactSettingsFromCloud(window.db, createInitialContactSettings());
     window.bookingSettings = state.bookingSettings;
+    state.publicSettingsLoaded = true;
+}
+
+async function ensureBookingCalendarLoaded({ force = false } = {}) {
+    if (state.bookingCalendarLoaded && !force) return;
+    await loadPublicSettings();
     await refreshRuntimeBusyBlocks();
+    await renderBookingCalendar();
+    state.bookingCalendarLoaded = true;
 }
 
 async function renderBookingCalendar() {
@@ -1507,7 +1551,8 @@ function wireTeacherActions() {
             setStatus(els.googleCalendarStatus, "Sign in as a teacher first.", "error");
             return;
         }
-        const ok = await withButtonLoading(event.currentTarget, "Connecting...", () => {
+        const ok = await withButtonLoading(event.currentTarget, "Connecting...", async () => {
+            await ensureGoogleCalendarModuleLoaded();
             return window.connectToGoogleCalendar?.((success, message) => {
                 state.googleCalendarMessage = success ? "Connection saved." : (message || "Connection failed.");
             });
@@ -1519,13 +1564,19 @@ function wireTeacherActions() {
     });
 
     els.googleDisconnectBtn?.addEventListener("click", async (event) => {
-        await withButtonLoading(event.currentTarget, "Disconnecting...", () => window.disconnectFromGoogleCalendar?.());
+        await withButtonLoading(event.currentTarget, "Disconnecting...", async () => {
+            await ensureGoogleCalendarModuleLoaded();
+            return window.disconnectFromGoogleCalendar?.();
+        });
         state.googleCalendarMessage = "Google Calendar disconnected.";
         await refreshGoogleCalendarStatus();
     });
 
     els.googleImportBtn?.addEventListener("click", async (event) => {
-        const result = await withButtonLoading(event.currentTarget, "Importing...", () => window.importGoogleCalendarEventsToBusyBlocks?.());
+        const result = await withButtonLoading(event.currentTarget, "Importing...", async () => {
+            await ensureGoogleCalendarModuleLoaded();
+            return window.importGoogleCalendarEventsToBusyBlocks?.();
+        });
         if (result?.success) {
             state.googleCalendarMessage = result.message || "Calendar events imported.";
             await refreshTeacherDashboard();
@@ -1535,7 +1586,10 @@ function wireTeacherActions() {
     });
 
     els.googleTestPreplyBtn?.addEventListener("click", async (event) => {
-        const result = await withButtonLoading(event.currentTarget, "Testing...", () => window.testPreplyCalendarAccess?.());
+        const result = await withButtonLoading(event.currentTarget, "Testing...", async () => {
+            await ensureGoogleCalendarModuleLoaded();
+            return window.testPreplyCalendarAccess?.();
+        });
         setStatus(els.googleCalendarStatus, result?.message || "Test finished.", result?.success ? "success" : "error");
     });
 
@@ -1560,6 +1614,10 @@ function showScreen(screenId) {
     if (els.openTeacherLoginBtn) {
         els.openTeacherLoginBtn.classList.toggle("is-active", screenId === "teacher-screen");
     }
+    if (screenId === "student-screen") {
+        ensureBookingCalendarLoaded().catch(console.error);
+        startGoogleBusyAutoRefresh();
+    }
 }
 
 async function handleAuthState(user) {
@@ -1575,10 +1633,6 @@ async function handleAuthState(user) {
         setStatus(els.teacherAuthMsg, "Sign in to access teacher controls.");
         setStatus(els.teacherLoginMsg, "");
         updateStudentAuthUi();
-        await loadStudentBookings();
-        await loadPublicSettings();
-        await renderBookingCalendar();
-        await refreshGoogleCalendarStatus();
         showScreen("welcome-screen");
         return;
     }
@@ -1599,9 +1653,11 @@ async function handleAuthState(user) {
         setStatus(els.teacherAuthMsg, "Sign in to access teacher controls.");
         setStatus(els.teacherLoginMsg, "");
         updateStudentAuthUi();
-        await loadStudentBookings();
-        await refreshGoogleCalendarStatus();
         showScreen("student-screen");
+        await Promise.all([
+            loadStudentBookings(),
+            ensureBookingCalendarLoaded(),
+        ]);
         return;
     }
 
@@ -1648,9 +1704,6 @@ async function init() {
         return;
     }
 
-    await loadPublicSettings();
-    await renderBookingCalendar();
-    startGoogleBusyAutoRefresh();
     window.auth.onAuthStateChanged((user) => {
         handleAuthState(user).catch(console.error);
     });
