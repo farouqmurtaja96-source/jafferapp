@@ -228,7 +228,15 @@ function setButtonLoading(button, loading, loadingText = "") {
     if (loading) {
         button.dataset.idleLabel = label?.textContent || button.textContent || "";
         if (label && loadingText) label.textContent = loadingText;
-        if (!label && loadingText) button.textContent = loadingText;
+        if (!label && loadingText) {
+            button.textContent = loadingText;
+        }
+        if (!button.querySelector(".btn__spinner")) {
+            const spinner = document.createElement("span");
+            spinner.className = "btn__spinner";
+            spinner.setAttribute("aria-hidden", "true");
+            button.appendChild(spinner);
+        }
         button.disabled = true;
         button.classList.add("is-loading");
         return;
@@ -237,6 +245,15 @@ function setButtonLoading(button, loading, loadingText = "") {
     if (!label && button.dataset.idleLabel) button.textContent = button.dataset.idleLabel;
     button.disabled = false;
     button.classList.remove("is-loading");
+}
+
+async function withButtonLoading(button, loadingText, task) {
+    try {
+        setButtonLoading(button, true, loadingText);
+        return await task();
+    } finally {
+        setButtonLoading(button, false);
+    }
 }
 
 function normalizeAppsScriptStudentError(result, fallbackMessage) {
@@ -549,9 +566,11 @@ async function renderBookingCalendar() {
                     minute: "2-digit",
                 });
                 btn.addEventListener("click", () => {
-                    state.visibleDateKey = day.dateKey;
-                    setSelectedSlot(slot.startMs);
-                    renderBookingCalendar().catch(console.error);
+                    withButtonLoading(btn, "Selecting...", async () => {
+                        state.visibleDateKey = day.dateKey;
+                        setSelectedSlot(slot.startMs);
+                        await renderBookingCalendar();
+                    }).catch(console.error);
                 });
                 body.appendChild(btn);
             });
@@ -884,7 +903,7 @@ function wireStudentActions() {
 
     els.studentLogoutBtn?.addEventListener("click", async () => {
         if (!window.auth) return;
-        await window.auth.signOut();
+        await withButtonLoading(els.studentLogoutBtn, "Signing out...", () => window.auth.signOut());
     });
 
     els.openTeacherLoginBtn?.addEventListener("click", () => {
@@ -896,23 +915,23 @@ function wireStudentActions() {
         setStatus(els.teacherLoginMsg, "");
     });
 
-    els.bookingWeekPrev?.addEventListener("click", () => {
+    els.bookingWeekPrev?.addEventListener("click", (event) => {
         state.bookingWeekOffset = Math.max(0, state.bookingWeekOffset - 1);
-        refreshGoogleBusyAndCalendar().catch(console.error);
+        withButtonLoading(event.currentTarget, "Loading...", () => refreshGoogleBusyAndCalendar()).catch(console.error);
     });
 
-    els.bookingWeekNext?.addEventListener("click", () => {
+    els.bookingWeekNext?.addEventListener("click", (event) => {
         state.bookingWeekOffset += 1;
-        refreshGoogleBusyAndCalendar().catch(console.error);
+        withButtonLoading(event.currentTarget, "Loading...", () => refreshGoogleBusyAndCalendar()).catch(console.error);
     });
 
-    els.bookingStatusBtn?.addEventListener("click", () => {
+    els.bookingStatusBtn?.addEventListener("click", (event) => {
         if (!state.currentUser) {
             setStatus(els.bookingStatusMsg, "Sign in to see your bookings.", "error");
             return;
         }
         setStatus(els.bookingStatusMsg, "");
-        loadStudentBookings().catch(() => {
+        withButtonLoading(event.currentTarget, "Refreshing...", () => loadStudentBookings()).catch(() => {
             setStatus(els.bookingStatusMsg, "Unable to load booking status right now.", "error");
         });
     });
@@ -1120,12 +1139,14 @@ function renderExceptions() {
 
     els.exceptionList.querySelectorAll("[data-remove-exception]").forEach((button) => {
         button.addEventListener("click", async () => {
-            const index = Number(button.getAttribute("data-remove-exception"));
-            if (!Number.isInteger(index)) return;
-            state.bookingSettings.exceptions.splice(index, 1);
-            await saveTeacherSettings();
-            renderExceptions();
-            renderBookingCalendar().catch(console.error);
+            await withButtonLoading(button, "Removing...", async () => {
+                const index = Number(button.getAttribute("data-remove-exception"));
+                if (!Number.isInteger(index)) return;
+                state.bookingSettings.exceptions.splice(index, 1);
+                await saveTeacherSettings();
+                renderExceptions();
+                await renderBookingCalendar();
+            });
         });
     });
 }
@@ -1251,48 +1272,56 @@ function wireTeacherActions() {
 
     els.teacherLogoutBtn?.addEventListener("click", async () => {
         if (!window.auth) return;
-        await window.auth.signOut();
+        await withButtonLoading(els.teacherLogoutBtn, "Signing out...", () => window.auth.signOut());
     });
 
     els.availabilityForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
+        const submitter = event.submitter;
         try {
-            state.bookingSettings.timezone = (els.teacherTimezone?.value || "").trim() || DEFAULT_TIMEZONE;
-            state.bookingSettings.slotMinutes = Number(els.teacherSlotMinutes?.value || 50);
-            state.bookingSettings.breakMinutes = Number(els.teacherBreakMinutes?.value || 10);
-            state.bookingSettings.totalSlotMinutes = state.bookingSettings.slotMinutes + state.bookingSettings.breakMinutes;
+            await withButtonLoading(submitter, "Saving...", async () => {
+                state.bookingSettings.timezone = (els.teacherTimezone?.value || "").trim() || DEFAULT_TIMEZONE;
+                state.bookingSettings.slotMinutes = Number(els.teacherSlotMinutes?.value || 50);
+                state.bookingSettings.breakMinutes = Number(els.teacherBreakMinutes?.value || 10);
+                state.bookingSettings.totalSlotMinutes = state.bookingSettings.slotMinutes + state.bookingSettings.breakMinutes;
 
-            DAY_KEYS.forEach((day) => {
-                state.bookingSettings.days[day] = {
-                    enabled: Boolean(document.querySelector(`[data-day-enabled="${day}"]`)?.checked),
-                    start: document.querySelector(`[data-day-start="${day}"]`)?.value || "09:00",
-                    end: document.querySelector(`[data-day-end="${day}"]`)?.value || "17:00",
-                };
+                DAY_KEYS.forEach((day) => {
+                    state.bookingSettings.days[day] = {
+                        enabled: Boolean(document.querySelector(`[data-day-enabled="${day}"]`)?.checked),
+                        start: document.querySelector(`[data-day-start="${day}"]`)?.value || "09:00",
+                        end: document.querySelector(`[data-day-end="${day}"]`)?.value || "17:00",
+                    };
+                });
+
+                await saveTeacherSettings();
+                await refreshRuntimeBusyBlocks();
+                await renderBookingCalendar();
             });
-
-            await saveTeacherSettings();
-            await refreshRuntimeBusyBlocks();
-            await renderBookingCalendar();
             setStatus(els.availabilityMsg, "Availability saved for both teacher and public booking settings.", "success");
         } catch (error) {
             setStatus(els.availabilityMsg, error.message || "Could not save availability.", "error");
         }
     });
 
-    els.teacherResetAvailabilityBtn?.addEventListener("click", async () => {
-        state.bookingSettings = getDefaultBookingSettings(getLocalTimezone());
-        await saveTeacherSettings();
-        syncTeacherFormFields();
-        await renderBookingCalendar();
-        setStatus(els.availabilityMsg, "Availability reset to default.", "success");
+    els.teacherResetAvailabilityBtn?.addEventListener("click", async (event) => {
+        await withButtonLoading(event.currentTarget, "Resetting...", async () => {
+            state.bookingSettings = getDefaultBookingSettings(getLocalTimezone());
+            await saveTeacherSettings();
+            syncTeacherFormFields();
+            await renderBookingCalendar();
+            setStatus(els.availabilityMsg, "Availability reset to default.", "success");
+        });
     });
 
     els.contactSettingsForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
-        state.contactSettings.whatsapp = (els.teacherWhatsapp?.value || "").trim();
-        state.contactSettings.email = (els.teacherContactEmail?.value || "").trim();
+        const submitter = event.submitter;
         try {
-            await saveTeacherContactSettings();
+            await withButtonLoading(submitter, "Saving...", async () => {
+                state.contactSettings.whatsapp = (els.teacherWhatsapp?.value || "").trim();
+                state.contactSettings.email = (els.teacherContactEmail?.value || "").trim();
+                await saveTeacherContactSettings();
+            });
             setStatus(els.contactMsg, "Contact settings saved.", "success");
         } catch (error) {
             setStatus(els.contactMsg, error.message || "Could not save contact settings.", "error");
@@ -1301,9 +1330,12 @@ function wireTeacherActions() {
 
     els.appsScriptForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
+        const submitter = event.submitter;
         try {
-            const result = await window.saveAppsScriptSettings?.({
-                webAppUrl: (els.teacherAppsScriptUrl?.value || "").trim(),
+            const result = await withButtonLoading(submitter, "Saving...", () => {
+                return window.saveAppsScriptSettings?.({
+                    webAppUrl: (els.teacherAppsScriptUrl?.value || "").trim(),
+                });
             });
             setStatus(els.appsScriptMsg, result?.message || "Apps Script settings saved.", result?.success === false ? "error" : "success");
         } catch (error) {
@@ -1311,14 +1343,16 @@ function wireTeacherActions() {
         }
     });
 
-    els.appsScriptTestBtn?.addEventListener("click", async () => {
-        const result = await window.testAppsScriptConnection?.();
+    els.appsScriptTestBtn?.addEventListener("click", async (event) => {
+        const result = await withButtonLoading(event.currentTarget, "Testing...", () => window.testAppsScriptConnection?.());
         setStatus(els.appsScriptMsg, result?.message || "Apps Script test finished.", result?.success ? "success" : "error");
     });
 
-    els.appsScriptRefreshBusyBtn?.addEventListener("click", async () => {
-        await refreshRuntimeBusyBlocks();
-        await renderBookingCalendar();
+    els.appsScriptRefreshBusyBtn?.addEventListener("click", async (event) => {
+        await withButtonLoading(event.currentTarget, "Importing...", async () => {
+            await refreshRuntimeBusyBlocks();
+            await renderBookingCalendar();
+        });
         setStatus(els.appsScriptMsg, state.runtimeBusyBlocks.length
             ? `Loaded ${state.runtimeBusyBlocks.length} busy blocks from Apps Script.`
             : "Apps Script busy blocks refreshed.", "success");
@@ -1326,20 +1360,23 @@ function wireTeacherActions() {
 
     els.exceptionForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
-        const date = els.exceptionDate?.value || "";
-        const start = els.exceptionStart?.value || "";
-        const end = els.exceptionEnd?.value || "";
-        const note = (els.exceptionNote?.value || "").trim();
-        if (!date || !start || !end || end <= start) {
-            setStatus(els.exceptionMsg, "Please enter a valid date and time range.", "error");
-            return;
-        }
-        state.bookingSettings.exceptions.push({ date, start, end, note });
-        await saveTeacherSettings();
-        renderExceptions();
-        await renderBookingCalendar();
-        setStatus(els.exceptionMsg, "Busy block added.", "success");
-        els.exceptionForm.reset();
+        const submitter = event.submitter;
+        await withButtonLoading(submitter, "Adding...", async () => {
+            const date = els.exceptionDate?.value || "";
+            const start = els.exceptionStart?.value || "";
+            const end = els.exceptionEnd?.value || "";
+            const note = (els.exceptionNote?.value || "").trim();
+            if (!date || !start || !end) {
+                setStatus(els.exceptionMsg, "Please enter a valid date and time range.", "error");
+                return;
+            }
+            state.bookingSettings.exceptions.push({ date, start, end, note });
+            await saveTeacherSettings();
+            renderExceptions();
+            await renderBookingCalendar();
+            setStatus(els.exceptionMsg, "Busy block added.", "success");
+            els.exceptionForm.reset();
+        });
     });
 
     els.exceptionToggle?.addEventListener("click", () => {
@@ -1350,25 +1387,29 @@ function wireTeacherActions() {
         }
     });
 
-    els.clearExceptionsBtn?.addEventListener("click", async () => {
-        state.bookingSettings.exceptions = [];
-        await saveTeacherSettings();
-        renderExceptions();
-        await renderBookingCalendar();
-        setStatus(els.exceptionMsg, "All busy blocks cleared.", "success");
+    els.clearExceptionsBtn?.addEventListener("click", async (event) => {
+        await withButtonLoading(event.currentTarget, "Clearing...", async () => {
+            state.bookingSettings.exceptions = [];
+            await saveTeacherSettings();
+            renderExceptions();
+            await renderBookingCalendar();
+            setStatus(els.exceptionMsg, "All busy blocks cleared.", "success");
+        });
     });
 
-    els.refreshBookingsBtn?.addEventListener("click", () => {
-        refreshTeacherBookings().catch(console.error);
+    els.refreshBookingsBtn?.addEventListener("click", (event) => {
+        withButtonLoading(event.currentTarget, "Refreshing...", () => refreshTeacherBookings()).catch(console.error);
     });
 
     els.clearBookingsBtn?.addEventListener("click", async () => {
         const confirmed = window.confirm("Delete all bookings from both private and public collections?");
         if (!confirmed) return;
         try {
-            await clearAllBookings({ db: window.db });
-            await refreshTeacherBookings();
-            await renderBookingCalendar();
+            await withButtonLoading(els.clearBookingsBtn, "Clearing...", async () => {
+                await clearAllBookings({ db: window.db });
+                await refreshTeacherBookings();
+                await renderBookingCalendar();
+            });
             setStatus(els.teacherBookingMsg, "All bookings deleted.", "success");
         } catch (error) {
             setStatus(els.teacherBookingMsg, error.message || "Could not delete bookings.", "error");
@@ -1384,7 +1425,16 @@ function wireTeacherActions() {
         if (!booking || !item) return;
 
         const action = button.getAttribute("data-action");
+        const teacherBookingLoadingText = {
+            cancel: "Canceling...",
+            reschedule: "Loading times...",
+            "confirm-reschedule": "Rescheduling...",
+        };
+        const shouldShowLoading = Boolean(teacherBookingLoadingText[action]);
         try {
+            if (shouldShowLoading) {
+                setButtonLoading(button, true, teacherBookingLoadingText[action]);
+            }
             if (action === "cancel") {
                 const deleteResult = await deleteCalendarEventForBooking(bookingId, booking);
                 if (deleteResult?.success === false && !isAlreadyDeletedCalendarEvent(deleteResult)) {
@@ -1445,16 +1495,22 @@ function wireTeacherActions() {
             }
         } catch (error) {
             setStatus(els.teacherBookingMsg, error.message || "Booking update failed.", "error");
+        } finally {
+            if (shouldShowLoading) {
+                setButtonLoading(button, false);
+            }
         }
     });
 
-    els.googleConnectBtn?.addEventListener("click", async () => {
+    els.googleConnectBtn?.addEventListener("click", async (event) => {
         if (!state.teacherUser) {
             setStatus(els.googleCalendarStatus, "Sign in as a teacher first.", "error");
             return;
         }
-        const ok = await window.connectToGoogleCalendar?.((success, message) => {
-            state.googleCalendarMessage = success ? "Connection saved." : (message || "Connection failed.");
+        const ok = await withButtonLoading(event.currentTarget, "Connecting...", () => {
+            return window.connectToGoogleCalendar?.((success, message) => {
+                state.googleCalendarMessage = success ? "Connection saved." : (message || "Connection failed.");
+            });
         });
         if (ok) {
             state.googleCalendarMessage = "Connection saved.";
@@ -1462,14 +1518,14 @@ function wireTeacherActions() {
         await refreshGoogleCalendarStatus();
     });
 
-    els.googleDisconnectBtn?.addEventListener("click", async () => {
-        await window.disconnectFromGoogleCalendar?.();
+    els.googleDisconnectBtn?.addEventListener("click", async (event) => {
+        await withButtonLoading(event.currentTarget, "Disconnecting...", () => window.disconnectFromGoogleCalendar?.());
         state.googleCalendarMessage = "Google Calendar disconnected.";
         await refreshGoogleCalendarStatus();
     });
 
-    els.googleImportBtn?.addEventListener("click", async () => {
-        const result = await window.importGoogleCalendarEventsToBusyBlocks?.();
+    els.googleImportBtn?.addEventListener("click", async (event) => {
+        const result = await withButtonLoading(event.currentTarget, "Importing...", () => window.importGoogleCalendarEventsToBusyBlocks?.());
         if (result?.success) {
             state.googleCalendarMessage = result.message || "Calendar events imported.";
             await refreshTeacherDashboard();
@@ -1478,13 +1534,13 @@ function wireTeacherActions() {
         }
     });
 
-    els.googleTestPreplyBtn?.addEventListener("click", async () => {
-        const result = await window.testPreplyCalendarAccess?.();
+    els.googleTestPreplyBtn?.addEventListener("click", async (event) => {
+        const result = await withButtonLoading(event.currentTarget, "Testing...", () => window.testPreplyCalendarAccess?.());
         setStatus(els.googleCalendarStatus, result?.message || "Test finished.", result?.success ? "success" : "error");
     });
 
-    els.savePreplyBtn?.addEventListener("click", () => {
-        savePreplyCalendarId().catch((error) => {
+    els.savePreplyBtn?.addEventListener("click", (event) => {
+        withButtonLoading(event.currentTarget, "Saving...", () => savePreplyCalendarId()).catch((error) => {
             setStatus(els.googleCalendarStatus, error.message || "Could not save Preply calendar ID.", "error");
         });
     });
