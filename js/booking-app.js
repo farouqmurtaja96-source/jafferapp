@@ -99,6 +99,8 @@ function cacheDom() {
         "contactEmailBtn",
         "bookingSuccessModal",
         "bookingSuccessText",
+        "openStudentGateBtn",
+        "openTeacherGateBtn",
         "openTeacherLoginBtn",
         "teacherLoginModal",
         "teacherLoginForm",
@@ -571,6 +573,22 @@ async function loadStudentBookings() {
 function wireStudentActions() {
     document.querySelectorAll("[data-target]").forEach((button) => {
         button.addEventListener("click", () => showScreen(button.getAttribute("data-target")));
+    });
+
+    els.openStudentGateBtn?.addEventListener("click", () => {
+        showScreen("student-screen");
+        window.setTimeout(() => {
+            els.studentAuthPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 80);
+    });
+
+    els.openTeacherGateBtn?.addEventListener("click", () => {
+        if (state.teacherUser && state.teacherRole === "teacher") {
+            showScreen("teacher-screen");
+            return;
+        }
+        els.teacherLoginModal?.classList.add("modal--open");
+        setStatus(els.teacherLoginMsg, "");
     });
 
     els.studentLoginModeBtn?.addEventListener("click", () => setStudentAuthMode("login"));
@@ -1159,7 +1177,7 @@ async function handleAuthState(user) {
         await loadPublicSettings();
         await renderBookingCalendar();
         await refreshGoogleCalendarStatus();
-        showScreen("student-screen");
+        showScreen("welcome-screen");
         return;
     }
 
@@ -1221,7 +1239,7 @@ async function init() {
     updateStudentAuthUi();
     wireStudentActions();
     wireTeacherActions();
-    showScreen("student-screen");
+    showScreen("welcome-screen");
 
     if (!window.db || !window.auth) {
         setStatus(els.bookingMsg, "Firebase runtime config is missing. Add js/config.runtime.js first.", "error");

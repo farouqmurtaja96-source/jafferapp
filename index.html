@@ -33,14 +33,39 @@
                 </div>
             </div>
             <nav class="site-nav">
-                <button class="nav-link is-active" data-target="student-screen" type="button">Student Booking</button>
+                <button class="nav-link is-active" data-target="welcome-screen" type="button">Home</button>
+                <button class="nav-link" data-target="student-screen" type="button">Student Booking</button>
                 <button class="nav-link" id="openTeacherLoginBtn" type="button">Teacher Dashboard</button>
             </nav>
         </div>
     </header>
 
     <main class="site-shell">
-        <section id="student-screen" class="app-screen app-screen--active">
+        <section id="welcome-screen" class="app-screen app-screen--active">
+            <div class="welcome-gate">
+                <div class="welcome-gate__copy">
+                    <p class="eyebrow">Lesson Booking</p>
+                    <h1>Choose how you want to continue</h1>
+                    <p class="section-copy">
+                        Students can create an account or sign in to book a lesson. Teachers can only enter with an approved teacher account.
+                    </p>
+                </div>
+                <div class="welcome-actions">
+                    <button class="welcome-card" id="openStudentGateBtn" type="button">
+                        <span class="welcome-card__kicker">Student</span>
+                        <strong>Student Sign In / Create Account</strong>
+                        <span>Book lessons and view your bookings.</span>
+                    </button>
+                    <button class="welcome-card welcome-card--teacher" id="openTeacherGateBtn" type="button">
+                        <span class="welcome-card__kicker">Teacher</span>
+                        <strong>Teacher Login</strong>
+                        <span>Manage availability, calendar sync, and bookings.</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="student-screen" class="app-screen">
             <div class="section-heading">
                 <div>
                     <p class="eyebrow">Student</p>
