@@ -109,7 +109,6 @@ function cacheDom() {
         "bookingSuccessText",
         "openStudentGateBtn",
         "openTeacherGateBtn",
-        "openTeacherLoginBtn",
         "teacherLoginModal",
         "teacherLoginForm",
         "teacherEmail",
@@ -950,15 +949,6 @@ function wireStudentActions() {
         await withButtonLoading(els.studentLogoutBtn, "Signing out...", () => window.auth.signOut());
     });
 
-    els.openTeacherLoginBtn?.addEventListener("click", () => {
-        if (state.teacherUser && state.teacherRole === "teacher") {
-            showScreen("teacher-screen");
-            return;
-        }
-        els.teacherLoginModal?.classList.add("modal--open");
-        setStatus(els.teacherLoginMsg, "");
-    });
-
     els.bookingWeekPrev?.addEventListener("click", (event) => {
         state.bookingWeekOffset = Math.max(0, state.bookingWeekOffset - 1);
         withButtonLoading(event.currentTarget, "Loading...", () => refreshGoogleBusyAndCalendar()).catch(console.error);
@@ -1611,9 +1601,6 @@ function showScreen(screenId) {
     document.querySelectorAll(".nav-link").forEach((button) => {
         button.classList.toggle("is-active", button.getAttribute("data-target") === screenId);
     });
-    if (els.openTeacherLoginBtn) {
-        els.openTeacherLoginBtn.classList.toggle("is-active", screenId === "teacher-screen");
-    }
     if (screenId === "student-screen") {
         ensureBookingCalendarLoaded().catch(console.error);
         startGoogleBusyAutoRefresh();
