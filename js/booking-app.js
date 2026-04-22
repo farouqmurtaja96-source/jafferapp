@@ -228,11 +228,13 @@ function setButtonLoading(button, loading, loadingText = "") {
     if (loading) {
         button.dataset.idleLabel = label?.textContent || button.textContent || "";
         if (label && loadingText) label.textContent = loadingText;
+        if (!label && loadingText) button.textContent = loadingText;
         button.disabled = true;
         button.classList.add("is-loading");
         return;
     }
     if (label) label.textContent = button.dataset.idleLabel || label.textContent;
+    if (!label && button.dataset.idleLabel) button.textContent = button.dataset.idleLabel;
     button.disabled = false;
     button.classList.remove("is-loading");
 }
@@ -922,7 +924,16 @@ function wireStudentActions() {
         const bookingId = item?.dataset.studentBookingId || "";
         const action = button.dataset.studentAction;
         if (!bookingId) return;
+        const loadingTextByAction = {
+            cancel: "Canceling...",
+            reschedule: "Loading times...",
+            "confirm-reschedule": "Rescheduling...",
+        };
+        const shouldShowLoading = Boolean(loadingTextByAction[action]);
         try {
+            if (shouldShowLoading) {
+                setButtonLoading(button, true, loadingTextByAction[action]);
+            }
             setStatus(els.bookingStatusMsg, "");
             if (action === "close-reschedule") {
                 const panel = item.querySelector(".booking-item__resched");
@@ -956,6 +967,10 @@ function wireStudentActions() {
             }
         } catch (error) {
             setStatus(els.bookingStatusMsg, error.message || "Could not update booking.", "error");
+        } finally {
+            if (shouldShowLoading) {
+                setButtonLoading(button, false);
+            }
         }
     });
 

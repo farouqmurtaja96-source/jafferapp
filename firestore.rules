@@ -225,6 +225,7 @@ service cloud.firestore {
             'status',
             'updatedAt',
             'calendarSynced',
+            'googleCalendarEventId',
             'history',
             'canceledAt',
             'rescheduledFrom',
