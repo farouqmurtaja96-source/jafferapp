@@ -244,6 +244,23 @@ function handleRequest_(e) {
       });
     }
 
+    if (action === 'deleteBooking') {
+      const eventId = req.eventId || '';
+      if (!eventId) {
+        return jsonOut({ success: false, message: 'Missing Google Calendar event ID.' });
+      }
+      const cal = CalendarApp.getCalendarById(config.primaryCalendarId);
+      if (!cal) {
+        return jsonOut({ success: false, message: 'Primary calendar not found.' });
+      }
+      const event = cal.getEventById(eventId);
+      if (!event) {
+        return jsonOut({ success: true, message: 'Calendar event was already removed.' });
+      }
+      event.deleteEvent();
+      return jsonOut({ success: true, message: 'Calendar event deleted.' });
+    }
+
     return jsonOut({ success: false, message: 'Unknown action.' });
   } catch (err) {
     return jsonOut({ success: false, message: err.message || String(err) });

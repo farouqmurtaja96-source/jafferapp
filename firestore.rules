@@ -39,6 +39,12 @@ service cloud.firestore {
       return status in ["booked", "pending", "canceled", "rescheduled"];
     }
 
+    function canStudentChangeBooking() {
+      return signedIn() &&
+        resource.data.studentUid == request.auth.uid &&
+        resource.data.slot > request.time.toMillis() + 12 * 60 * 60 * 1000;
+    }
+
     match /users/{uid} {
       allow read: if ownsDoc(uid);
       allow create: if ownsDoc(uid) &&
@@ -129,16 +135,32 @@ service cloud.firestore {
         request.resource.data.studentUid == request.auth.uid &&
         request.resource.data.status == "booked";
 
-      allow update: if isTeacher() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'slot',
-          'status',
-          'updatedAt',
-          'calendarSynced',
-          'rescheduledFrom',
-          'rescheduledAt'
-        ]) &&
-        isSafeStatus(request.resource.data.status);
+      allow update: if (
+        isTeacher() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'slot',
+            'status',
+            'updatedAt',
+            'calendarSynced',
+            'rescheduledFrom',
+            'rescheduledAt'
+          ]) &&
+          isSafeStatus(request.resource.data.status)
+      ) || (
+        signedIn() &&
+          resource.data.studentUid == request.auth.uid &&
+          resource.data.slot > request.time.toMillis() + 12 * 60 * 60 * 1000 &&
+          request.resource.data.studentUid == resource.data.studentUid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'slot',
+            'status',
+            'updatedAt',
+            'calendarSynced',
+            'rescheduledFrom',
+            'rescheduledAt'
+          ]) &&
+          request.resource.data.status in ["canceled", "rescheduled"]
+      );
 
       allow delete: if isTeacher();
     }
@@ -180,20 +202,36 @@ service cloud.firestore {
       allow read: if isTeacher() ||
         (signedIn() && resource.data.studentUid == request.auth.uid);
 
-      allow update: if isTeacher() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'slot',
-          'notes',
-          'status',
-          'updatedAt',
-          'calendarSynced',
-          'googleCalendarEventId',
-          'history',
-          'canceledAt',
-          'rescheduledFrom',
-          'rescheduledAt'
-        ]) &&
-        isSafeStatus(request.resource.data.status);
+      allow update: if (
+        isTeacher() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'slot',
+            'notes',
+            'status',
+            'updatedAt',
+            'calendarSynced',
+            'googleCalendarEventId',
+            'history',
+            'canceledAt',
+            'rescheduledFrom',
+            'rescheduledAt'
+          ]) &&
+          isSafeStatus(request.resource.data.status)
+      ) || (
+        canStudentChangeBooking() &&
+          request.resource.data.studentUid == resource.data.studentUid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'slot',
+            'status',
+            'updatedAt',
+            'calendarSynced',
+            'history',
+            'canceledAt',
+            'rescheduledFrom',
+            'rescheduledAt'
+          ]) &&
+          request.resource.data.status in ["canceled", "rescheduled"]
+      );
 
       allow delete: if isTeacher();
     }

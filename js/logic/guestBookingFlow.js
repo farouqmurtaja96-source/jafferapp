@@ -60,6 +60,7 @@ export async function submitGuestBooking({
     bookingSuccessText,
     bookingStatusEmail,
     findBookingConflict,
+    refreshCalendarAvailability,
     buildBookingSelects,
     hashEmail,
     sendBookingEmail,
@@ -138,6 +139,12 @@ export async function submitGuestBooking({
         if (bookingMsg) bookingMsg.textContent = "Booking your lesson...";
 
         const slot = slotDate.toLocaleString();
+        const refreshed = await refreshCalendarAvailability?.();
+        if (refreshed === false) {
+            if (bookingMsg) bookingMsg.textContent = "Calendar sync is unavailable. Please try again in a moment.";
+            await buildBookingSelects();
+            return;
+        }
         const conflict = await findBookingConflict(selectedSlot);
         if (conflict) {
             if (bookingMsg) bookingMsg.textContent = "That time was just taken. Please choose another slot.";

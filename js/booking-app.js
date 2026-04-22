@@ -35,6 +35,7 @@ import {
 const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_TIMEZONE = "Africa/Cairo";
 const GOOGLE_BUSY_REFRESH_MS = 60000;
+const STUDENT_CHANGE_CUTOFF_MS = 12 * 60 * 60 * 1000;
 
 const state = {
     bookingSettings: ensureBookingSettingsShape(createInitialBookingSettings()),
@@ -54,6 +55,8 @@ const state = {
     googleCalendarMessage: "",
     busyRefreshTimer: null,
     busyRefreshInFlight: null,
+    busySyncReady: false,
+    busySyncMessage: "",
 };
 
 const els = {};
@@ -109,6 +112,7 @@ function cacheDom() {
         "teacherLoginForm",
         "teacherEmail",
         "teacherPassword",
+        "teacherLoginSubmit",
         "teacherLoginMsg",
         "teacherLogoutBtn",
         "teacherAuthBadge",
@@ -217,6 +221,21 @@ function setStatus(element, message, tone = "") {
     if (tone === "success") element.classList.add("is-success");
 }
 
+function setButtonLoading(button, loading, loadingText = "") {
+    if (!button) return;
+    const label = button.querySelector(".btn__label");
+    if (loading) {
+        button.dataset.idleLabel = label?.textContent || button.textContent || "";
+        if (label && loadingText) label.textContent = loadingText;
+        button.disabled = true;
+        button.classList.add("is-loading");
+        return;
+    }
+    if (label) label.textContent = button.dataset.idleLabel || label.textContent;
+    button.disabled = false;
+    button.classList.remove("is-loading");
+}
+
 function getLocalTimezone() {
     try {
         return Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TIMEZONE;
@@ -287,7 +306,12 @@ function setStudentAuthMode(mode) {
         els.studentPhoneField.hidden = state.studentAuthMode !== "signup";
     }
     if (els.studentAuthSubmit) {
-        els.studentAuthSubmit.textContent = state.studentAuthMode === "signup" ? "Create Account" : "Sign In";
+        const label = els.studentAuthSubmit.querySelector(".btn__label");
+        if (label) {
+            label.textContent = state.studentAuthMode === "signup" ? "Create Account" : "Sign In";
+        } else {
+            els.studentAuthSubmit.textContent = state.studentAuthMode === "signup" ? "Create Account" : "Sign In";
+        }
     }
     els.studentLoginModeBtn?.classList.toggle("btn--primary", state.studentAuthMode === "login");
     els.studentLoginModeBtn?.classList.toggle("btn--outline", state.studentAuthMode !== "login");
@@ -372,15 +396,17 @@ async function refreshRuntimeBusyBlocks() {
 async function refreshRuntimeBusyBlocksNow() {
     if (typeof window.fetchBusyBlocksFromAppsScript !== "function") {
         state.runtimeBusyBlocks = [];
+        state.busySyncReady = false;
+        state.busySyncMessage = "Calendar sync is not available right now.";
         return;
     }
     const result = await window.fetchBusyBlocksFromAppsScript({
         days: 45,
         timeZone: state.bookingSettings.timezone || getLocalTimezone(),
     });
-    state.runtimeBusyBlocks = result?.success && Array.isArray(result.busyBlocks)
-        ? result.busyBlocks
-        : [];
+    state.busySyncReady = !!(result?.success && Array.isArray(result.busyBlocks));
+    state.busySyncMessage = state.busySyncReady ? "" : (result?.message || "Could not reach Google Calendar sync.");
+    state.runtimeBusyBlocks = state.busySyncReady ? result.busyBlocks : [];
 }
 
 async function refreshGoogleBusyAndCalendar({ silent = true } = {}) {
@@ -389,10 +415,12 @@ async function refreshGoogleBusyAndCalendar({ silent = true } = {}) {
     if (!silent) {
         setStatus(
             els.bookingMsg,
-            state.runtimeBusyBlocks.length
+            state.busySyncReady && state.runtimeBusyBlocks.length
                 ? "Calendar availability refreshed."
-                : "Calendar availability checked.",
-            "success"
+                : state.busySyncReady
+                    ? "Calendar availability checked."
+                    : "Calendar sync is unavailable. Please try again in a moment.",
+            state.busySyncReady ? "success" : "error"
         );
     }
 }
@@ -438,6 +466,18 @@ async function renderBookingCalendar() {
     const timezone = getLocalTimezone();
     if (els.bookingTimezoneLabel) {
         els.bookingTimezoneLabel.textContent = `Showing times in ${timezone}`;
+    }
+
+    if (!state.busySyncReady) {
+        setSelectedSlot(null);
+        if (els.bookingDateChips) els.bookingDateChips.innerHTML = "";
+        if (els.bookingWeeklyGrid) els.bookingWeeklyGrid.innerHTML = "";
+        if (els.bookingEmptyState) {
+            els.bookingEmptyState.hidden = false;
+            els.bookingEmptyState.textContent = state.busySyncMessage
+                || "Calendar sync is unavailable. Please refresh in a moment.";
+        }
+        return;
     }
 
     const schedule = await getSchedulableSlots(42, bookingDeps());
@@ -568,10 +608,20 @@ async function loadStudentBookings() {
         els.bookingStatusList.innerHTML = rows.map((b) => {
             const status = (b.status || "booked").toLowerCase();
             const label = status === "canceled" ? "Canceled" : status === "rescheduled" ? "Rescheduled" : "Booked";
+            const canChange = status !== "canceled" && Number(b.slot || 0) - Date.now() >= STUDENT_CHANGE_CUTOFF_MS;
+            const cutoffNote = status !== "canceled" && !canChange
+                ? "<div class=\"small-note\">Changes close 12 hours before the lesson.</div>"
+                : "";
             return `
-                <div class="booking-status-item">
+                <div class="booking-status-item" data-student-booking-id="${escapeHtml(b.id)}">
                     <div><strong>${escapeHtml(formatSlotTime(b.slot))}</strong></div>
                     <div>Status: ${escapeHtml(label)}</div>
+                    ${cutoffNote}
+                    <div class="booking-item__actions">
+                        <button class="btn btn--ghost btn--small" data-student-action="cancel" ${canChange ? "" : "disabled"}>Cancel</button>
+                        <button class="btn btn--outline btn--small" data-student-action="reschedule" ${canChange ? "" : "disabled"}>Reschedule</button>
+                    </div>
+                    <div class="booking-item__resched"></div>
                 </div>
             `;
         }).join("");
@@ -579,6 +629,137 @@ async function loadStudentBookings() {
         console.error("Could not load student bookings.", error);
         els.bookingStatusList.innerHTML = "<div class=\"small-note\">Unable to load your bookings right now.</div>";
     }
+}
+
+async function cancelStudentBooking(bookingId) {
+    const snap = await window.db.collection("bookings").doc(bookingId).get();
+    const booking = snap.data() || {};
+    if (booking.studentUid !== state.currentUser?.uid) throw new Error("This booking does not belong to your account.");
+    if (Number(booking.slot || 0) - Date.now() < STUDENT_CHANGE_CUTOFF_MS) {
+        throw new Error("You cannot cancel less than 12 hours before the lesson.");
+    }
+    if (booking.googleCalendarEventId && typeof window.deleteBookingViaAppsScript === "function") {
+        const result = await window.deleteBookingViaAppsScript({ eventId: booking.googleCalendarEventId });
+        if (result?.success === false) {
+            throw new Error(result.message || "Could not remove this booking from Google Calendar.");
+        }
+    }
+    await window.db.collection("bookings").doc(bookingId).set({
+        status: "canceled",
+        updatedAt: Date.now(),
+        calendarSynced: false,
+        canceledAt: Date.now(),
+        history: window.firebase.firestore.FieldValue.arrayUnion({
+            at: Date.now(),
+            action: "canceled",
+            by: "student",
+        }),
+    }, { merge: true });
+    await window.db.collection("publicBookings").doc(bookingId).set({
+        status: "canceled",
+        updatedAt: Date.now(),
+        calendarSynced: false,
+    }, { merge: true });
+}
+
+async function openStudentReschedulePanel(itemEl, bookingId) {
+    const resched = itemEl.querySelector(".booking-item__resched");
+    if (!resched) return;
+    if (resched.classList.contains("is-open")) {
+        resched.classList.remove("is-open");
+        resched.innerHTML = "";
+        return;
+    }
+    const bookingSnap = await window.db.collection("bookings").doc(bookingId).get();
+    const booking = { id: bookingSnap.id, ...(bookingSnap.data() || {}) };
+    if (booking.studentUid !== state.currentUser?.uid) throw new Error("This booking does not belong to your account.");
+    if (Number(booking.slot || 0) - Date.now() < STUDENT_CHANGE_CUTOFF_MS) {
+        throw new Error("You cannot reschedule less than 12 hours before the lesson.");
+    }
+    resched.classList.add("is-open");
+    resched.innerHTML = "<div class=\"small-note\">Loading available times...</div>";
+    await refreshRuntimeBusyBlocks();
+    if (!state.busySyncReady) {
+        resched.innerHTML = "<div class=\"small-note\">Calendar sync is unavailable. Please try again later.</div>";
+        return;
+    }
+    const slots = await getAvailableSlots(30, bookingDeps(), { excludeBookingId: bookingId });
+    const options = slots.slice(0, 80).map((slotDate) => {
+        const ts = slotDate.getTime();
+        return `<option value="${ts}">${escapeHtml(slotDate.toLocaleString())}</option>`;
+    });
+    if (!options.length) {
+        resched.innerHTML = "<div class=\"small-note\">No available times right now.</div>";
+        return;
+    }
+    resched.innerHTML = `
+        <select class="booking-resched-select">${options.join("")}</select>
+        <button class="btn btn--primary btn--small" data-student-action="confirm-reschedule">Confirm</button>
+        <button class="btn btn--ghost btn--small" data-student-action="close-reschedule">Close</button>
+    `;
+}
+
+async function rescheduleStudentBooking(bookingId, newSlot) {
+    const snap = await window.db.collection("bookings").doc(bookingId).get();
+    const booking = snap.data() || {};
+    if (booking.studentUid !== state.currentUser?.uid) throw new Error("This booking does not belong to your account.");
+    if (Number(booking.slot || 0) - Date.now() < STUDENT_CHANGE_CUTOFF_MS) {
+        throw new Error("You cannot reschedule less than 12 hours before the lesson.");
+    }
+    const conflict = await findBookingConflict(newSlot, bookingDeps(), { excludeBookingId: bookingId });
+    if (conflict) throw new Error("That time is no longer available.");
+    if (booking.googleCalendarEventId && typeof window.deleteBookingViaAppsScript === "function") {
+        const deleteResult = await window.deleteBookingViaAppsScript({ eventId: booking.googleCalendarEventId });
+        if (deleteResult?.success === false) {
+            throw new Error(deleteResult.message || "Could not remove the old Google Calendar event.");
+        }
+    }
+    let calendarSynced = false;
+    let googleCalendarEventId = null;
+    if (typeof window.createBookingViaAppsScript === "function") {
+        const createResult = await window.createBookingViaAppsScript({
+            bookingId,
+            slot: newSlot,
+            durationMinutes: 50,
+            timeZone: state.bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
+            teacherEmail: (state.contactSettings?.email || "").trim(),
+            name: booking.name || getStudentName(),
+            email: booking.email || state.currentUser?.email || "",
+            phone: booking.phone || getStudentPhone(),
+            notes: booking.notes || "",
+            studentTimeZone: getLocalTimezone(),
+            studentLocale: navigator.language || "",
+        });
+        if (createResult?.success === false) {
+            throw new Error(createResult.message || "Could not create the new Google Calendar event.");
+        }
+        calendarSynced = !!createResult?.success;
+        googleCalendarEventId = createResult?.eventId || null;
+    }
+    await window.db.collection("bookings").doc(bookingId).set({
+        slot: newSlot,
+        status: "rescheduled",
+        updatedAt: Date.now(),
+        calendarSynced,
+        googleCalendarEventId,
+        rescheduledFrom: booking.slot,
+        rescheduledAt: Date.now(),
+        history: window.firebase.firestore.FieldValue.arrayUnion({
+            at: Date.now(),
+            action: "rescheduled",
+            by: "student",
+            from: booking.slot,
+            to: newSlot,
+        }),
+    }, { merge: true });
+    await window.db.collection("publicBookings").doc(bookingId).set({
+        slot: newSlot,
+        status: "rescheduled",
+        updatedAt: Date.now(),
+        calendarSynced,
+        rescheduledFrom: booking.slot,
+        rescheduledAt: Date.now(),
+    }, { merge: true });
 }
 
 function wireStudentActions() {
@@ -618,14 +799,21 @@ function wireStudentActions() {
         const name = (els.studentName?.value || "").trim().slice(0, 100);
         const phone = normalizePhoneNumber();
         try {
+            setButtonLoading(
+                els.studentAuthSubmit,
+                true,
+                state.studentAuthMode === "signup" ? "Creating..." : "Signing in..."
+            );
             setStatus(els.studentAuthMsg, state.studentAuthMode === "signup" ? "Creating account..." : "Signing in...");
             if (state.studentAuthMode === "signup") {
                 if (name.length < 2) {
                     setStatus(els.studentAuthMsg, "Please enter your full name.", "error");
+                    setButtonLoading(els.studentAuthSubmit, false);
                     return;
                 }
                 if (!phone) {
                     setStatus(els.studentAuthMsg, "Please enter your mobile number.", "error");
+                    setButtonLoading(els.studentAuthSubmit, false);
                     return;
                 }
                 const cred = await window.auth.createUserWithEmailAndPassword(email, password);
@@ -649,6 +837,8 @@ function wireStudentActions() {
             }
         } catch (error) {
             setStatus(els.studentAuthMsg, error.message || "Student sign-in failed.", "error");
+        } finally {
+            setButtonLoading(els.studentAuthSubmit, false);
         }
     });
 
@@ -685,6 +875,50 @@ function wireStudentActions() {
         loadStudentBookings().catch(() => {
             setStatus(els.bookingStatusMsg, "Unable to load booking status right now.", "error");
         });
+    });
+
+    els.bookingStatusList?.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-student-action]");
+        if (!button) return;
+        const item = button.closest("[data-student-booking-id]");
+        const bookingId = item?.dataset.studentBookingId || "";
+        const action = button.dataset.studentAction;
+        if (!bookingId) return;
+        try {
+            setStatus(els.bookingStatusMsg, "");
+            if (action === "close-reschedule") {
+                const panel = item.querySelector(".booking-item__resched");
+                panel?.classList.remove("is-open");
+                if (panel) panel.innerHTML = "";
+                return;
+            }
+            if (action === "cancel") {
+                await cancelStudentBooking(bookingId);
+                setStatus(els.bookingStatusMsg, "Booking canceled.", "success");
+                await loadStudentBookings();
+                await renderBookingCalendar();
+                return;
+            }
+            if (action === "reschedule") {
+                await openStudentReschedulePanel(item, bookingId);
+                return;
+            }
+            if (action === "confirm-reschedule") {
+                const newSlot = Number(item.querySelector(".booking-resched-select")?.value || 0);
+                if (!newSlot) return;
+                await refreshRuntimeBusyBlocks();
+                if (!state.busySyncReady) {
+                    setStatus(els.bookingStatusMsg, "Calendar sync is unavailable. Please try again later.", "error");
+                    return;
+                }
+                await rescheduleStudentBooking(bookingId, newSlot);
+                setStatus(els.bookingStatusMsg, "Booking rescheduled.", "success");
+                await loadStudentBookings();
+                await renderBookingCalendar();
+            }
+        } catch (error) {
+            setStatus(els.bookingStatusMsg, error.message || "Could not update booking.", "error");
+        }
     });
 
     els.contactWhatsAppBtn?.addEventListener("click", () => {
@@ -764,6 +998,10 @@ function wireStudentActions() {
             bookingSuccessModal: els.bookingSuccessModal,
             bookingSuccessText: els.bookingSuccessText,
             bookingStatusEmail: els.bookingStatusEmail,
+            refreshCalendarAvailability: async () => {
+                await refreshRuntimeBusyBlocks();
+                return state.busySyncReady;
+            },
             findBookingConflict: async (slotMs) => {
                 await refreshRuntimeBusyBlocks();
                 return findBookingConflict(slotMs, bookingDeps());
@@ -945,6 +1183,7 @@ function wireTeacherActions() {
             return;
         }
         try {
+            setButtonLoading(els.teacherLoginSubmit, true, "Signing in...");
             setStatus(els.teacherLoginMsg, "Signing in...");
             await window.auth.signInWithEmailAndPassword(
                 (els.teacherEmail?.value || "").trim(),
@@ -952,6 +1191,8 @@ function wireTeacherActions() {
             );
         } catch (error) {
             setStatus(els.teacherLoginMsg, error.message || "Sign-in failed.", "error");
+        } finally {
+            setButtonLoading(els.teacherLoginSubmit, false);
         }
     });
 

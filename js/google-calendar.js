@@ -246,21 +246,6 @@ async function ensureGoogleCalendarAccess({ interactive = false } = {}) {
     return null;
 }
 
-// Auto-initialize when script loads
-window.addEventListener('DOMContentLoaded', async () => {
-    console.log("Initializing Google Calendar API...");
-    try {
-        const ok = await initializeGoogleCalendar();
-        if (ok) {
-            console.log("Google Calendar API initialized successfully");
-        } else {
-            console.warn("Google Calendar API initialization did not complete.");
-        }
-    } catch (error) {
-        console.error("Error initializing Google Calendar API:", error);
-    }
-});
-
 // Global initialization functions called from HTML
 window.handleClientLoad = async function() {
     try {
@@ -299,6 +284,10 @@ async function initializeGoogleCalendar() {
 // Load GAPI client
 function gapiLoaded() {
     return new Promise((resolve, reject) => {
+        if (!window.gapi?.load) {
+            reject(new Error('Google API client is not available'));
+            return;
+        }
         gapi.load('client', () => {
             try {
                 gapiInited = true;
@@ -313,6 +302,10 @@ function gapiLoaded() {
 // Load GIS client
 function gisLoaded() {
     return new Promise((resolve, reject) => {
+        if (!window.google?.accounts?.oauth2?.initTokenClient) {
+            reject(new Error('Google Identity Services is not available'));
+            return;
+        }
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: googleCalendarConfig.clientId,
             scope: googleCalendarConfig.scopes,

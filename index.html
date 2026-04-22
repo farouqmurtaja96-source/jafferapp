@@ -15,8 +15,7 @@
     <script src="./js/config.js"></script>
     <script src="./js/google-calendar.js"></script>
     <script src="https://apis.google.com/js/api.js"
-        onload="window.handleClientLoad && window.handleClientLoad()"
-        onerror="console.error('Error loading GAPI')"></script>
+        onload="window.handleClientLoad && window.handleClientLoad()"></script>
     <script src="https://accounts.google.com/gsi/client"
         onload="window.handleGisLoad && window.handleGisLoad()"
         async defer></script>
@@ -325,7 +324,7 @@
         <div class="modal__body">
             <button class="modal__close" data-close-teacher-modal type="button">&times;</button>
             <h3>Teacher Login</h3>
-            <p class="small-note">Only a user with the `teacher` role can enter the dashboard.</p>
+            
             <form id="teacherLoginForm" class="form-stack">
                 <label class="field">
                     <span>Email</span>
@@ -336,7 +335,10 @@
                     <input id="teacherPassword" type="password" placeholder="Password" required />
                 </label>
                 <div class="action-row">
-                    <button type="submit" class="btn btn--primary">Sign In</button>
+                    <button type="submit" class="btn btn--primary" id="teacherLoginSubmit">
+                        <span class="btn__label">Sign In</span>
+                        <span class="btn__spinner" aria-hidden="true"></span>
+                    </button>
                 </div>
                 <p id="teacherLoginMsg" class="status-line"></p>
             </form>
@@ -382,7 +384,10 @@
                     <span>Password</span>
                     <input id="studentPassword" type="password" placeholder="Password" required />
                 </label>
-                <button type="submit" class="btn btn--primary btn--full" id="studentAuthSubmit">Sign In</button>
+                <button type="submit" class="btn btn--primary btn--full" id="studentAuthSubmit">
+                    <span class="btn__label">Sign In</span>
+                    <span class="btn__spinner" aria-hidden="true"></span>
+                </button>
                 <p id="studentAuthMsg" class="status-line"></p>
             </form>
         </div>

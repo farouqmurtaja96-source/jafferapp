@@ -117,6 +117,10 @@ async function createBookingViaAppsScript(payload) {
     return callAppsScript("createBooking", payload);
 }
 
+async function deleteBookingViaAppsScript(payload) {
+    return callAppsScript("deleteBooking", payload);
+}
+
 async function syncPendingBookingsViaAppsScript({ limit = 10 } = {}) {
     try {
         const snap = await window.db
@@ -178,4 +182,5 @@ window.saveAppsScriptSettings = saveAppsScriptSettings;
 window.testAppsScriptConnection = testAppsScriptConnection;
 window.fetchBusyBlocksFromAppsScript = fetchBusyBlocksFromAppsScript;
 window.createBookingViaAppsScript = createBookingViaAppsScript;
+window.deleteBookingViaAppsScript = deleteBookingViaAppsScript;
 window.syncPendingBookingsViaAppsScript = syncPendingBookingsViaAppsScript;
