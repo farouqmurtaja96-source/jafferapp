@@ -25,6 +25,9 @@ In Apps Script:
 `PREPLY_CALENDAR_ID`
 : your Preply Google calendar ID
 
+`ADDITIONAL_CALENDAR_IDS`
+: optional. Add any other Google Calendar IDs that should block student booking times. Separate multiple IDs with commas or new lines.
+
 `DEFAULT_TIMEZONE`
 : for example `Africa/Cairo`
 
@@ -52,6 +55,12 @@ In your site:
 If you also want Preply busy times:
 1. Save your Preply calendar ID in Apps Script properties
 2. Also save it in the teacher dashboard for easier testing
+
+If you also have busy events on another Google Calendar:
+1. Open that calendar settings in Google Calendar
+2. Copy its `Calendar ID`
+3. Add it to `ADDITIONAL_CALENDAR_IDS`
+4. Deploy a new Apps Script version
 
 ## Notes
 

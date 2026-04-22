@@ -7,9 +7,11 @@ function jsonOut(obj) {
 function getConfig_() {
   const props = PropertiesService.getScriptProperties();
   const preplyRaw = props.getProperty('PREPLY_CALENDAR_ID') || '';
+  const additionalRaw = props.getProperty('ADDITIONAL_CALENDAR_IDS') || '';
   return {
     primaryCalendarId: props.getProperty('PRIMARY_CALENDAR_ID') || 'primary',
     preplyCalendarId: normalizeCalendarId_(preplyRaw),
+    additionalCalendarIds: parseCalendarIds_(additionalRaw),
     defaultTimeZone: props.getProperty('DEFAULT_TIMEZONE') || Session.getScriptTimeZone() || 'Africa/Cairo',
     notificationEmail: props.getProperty('NOTIFICATION_EMAIL') || '',
   };
@@ -74,6 +76,26 @@ function normalizeCalendarId_(value) {
   return srcMatch && srcMatch[1] ? decodeURIComponent(srcMatch[1]) : raw;
 }
 
+function parseCalendarIds_(value) {
+  return String(value || '')
+    .split(/[\n,]+/)
+    .map(function (item) {
+      return normalizeCalendarId_(item);
+    })
+    .filter(function (item, index, list) {
+      return item && list.indexOf(item) === index;
+    });
+}
+
+function getBusyCalendarIds_(config) {
+  const ids = [config.primaryCalendarId || 'primary'];
+  if (config.preplyCalendarId) ids.push(config.preplyCalendarId);
+  (config.additionalCalendarIds || []).forEach(function (id) {
+    if (ids.indexOf(id) === -1) ids.push(id);
+  });
+  return ids;
+}
+
 function parseRequest_(e) {
   let body = {};
   try {
@@ -94,6 +116,7 @@ function listEvents_(calendarId, start, end) {
       title: event.getTitle(),
       start: event.getStartTime().getTime(),
       end: event.getEndTime().getTime(),
+      calendarId: calendarId,
     };
   });
 }
@@ -162,6 +185,7 @@ function handleRequest_(e) {
         message: primary ? 'Apps Script backend is reachable.' : 'Primary calendar not found.',
         timeZone: config.defaultTimeZone,
         preplyCalendarId: config.preplyCalendarId || '',
+        additionalCalendarCount: (config.additionalCalendarIds || []).length,
       });
     }
 
@@ -170,10 +194,11 @@ function handleRequest_(e) {
       const timeZone = req.timeZone || config.defaultTimeZone;
       const start = new Date();
       const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
-      let events = listEvents_(config.primaryCalendarId, start, end);
-      if (config.preplyCalendarId) {
-        events = events.concat(listEvents_(config.preplyCalendarId, start, end));
-      }
+      const calendarIds = getBusyCalendarIds_(config);
+      let events = [];
+      calendarIds.forEach(function (calendarId) {
+        events = events.concat(listEvents_(calendarId, start, end));
+      });
       return jsonOut({
         success: true,
         message: 'Busy times loaded.',
@@ -181,6 +206,8 @@ function handleRequest_(e) {
         counts: {
           total: events.length,
           preplyEnabled: !!config.preplyCalendarId,
+          calendarsChecked: calendarIds.length,
+          additionalCalendars: (config.additionalCalendarIds || []).length,
         }
       });
     }
