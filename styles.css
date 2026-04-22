@@ -547,32 +547,6 @@ main.site-shell {
     font-weight: 600;
 }
 
-.date-chips {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-}
-
-.date-chip {
-    padding: 9px 14px;
-    border-radius: 999px;
-    border: 1px solid rgba(15, 118, 110, 0.18);
-    background: rgba(15, 118, 110, 0.06);
-    color: var(--primary-dark);
-    font-weight: 600;
-}
-
-.date-chip:not(.is-selected):hover {
-    background: rgba(15, 118, 110, 0.1);
-}
-
-.date-chip.is-selected {
-    background: linear-gradient(135deg, var(--primary), #128277);
-    color: #fff;
-    border-color: var(--primary);
-}
-
 .week-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -945,8 +919,15 @@ main.site-shell {
     }
 
     .week-grid {
-        grid-template-columns: 1fr;
-        gap: 0;
+        display: flex;
+        grid-template-columns: none;
+        gap: 12px;
+        overflow-x: auto;
+        margin: 0 -20px;
+        padding: 2px 20px 12px;
+        scroll-padding: 20px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: thin;
     }
 
     .panel,
@@ -978,28 +959,12 @@ main.site-shell {
         padding: 16px;
     }
 
-    .date-chips {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding-bottom: 6px;
-        margin-right: -4px;
-        scrollbar-width: thin;
-        scroll-snap-type: x proximity;
-    }
-
-    .date-chip {
-        flex: 0 0 auto;
-        min-width: max-content;
-        scroll-snap-align: start;
-    }
-
     .booking-day-column {
-        display: none;
+        display: block;
+        flex: 0 0 min(82vw, 340px);
         min-height: auto;
-        padding: 0;
-        border: 0;
-        background: transparent;
-        box-shadow: none;
+        padding: 16px;
+        scroll-snap-align: start;
     }
 
     .booking-day-column.is-focused {

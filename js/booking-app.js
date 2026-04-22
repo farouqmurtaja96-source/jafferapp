@@ -71,7 +71,6 @@ function cacheDom() {
         "bookingWeekPrev",
         "bookingWeekNext",
         "bookingWeekLabel",
-        "bookingDateChips",
         "bookingWeeklyGrid",
         "bookingEmptyState",
         "bookingInfo",
@@ -463,24 +462,6 @@ async function loadPublicSettings() {
     await refreshRuntimeBusyBlocks();
 }
 
-function renderDateChips(days) {
-    if (!els.bookingDateChips) return;
-    els.bookingDateChips.innerHTML = "";
-    days.forEach((day) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `date-chip${day.dateKey === state.visibleDateKey ? " is-selected" : ""}`;
-        btn.textContent = day.label;
-        btn.addEventListener("click", () => {
-            state.visibleDateKey = day.dateKey;
-            if (!day.firstSlotMs) return;
-            setSelectedSlot(day.firstSlotMs);
-            renderBookingCalendar().catch(console.error);
-        });
-        els.bookingDateChips.appendChild(btn);
-    });
-}
-
 async function renderBookingCalendar() {
     if (!window.db) return;
     const timezone = getLocalTimezone();
@@ -490,7 +471,6 @@ async function renderBookingCalendar() {
 
     if (!state.busySyncReady) {
         setSelectedSlot(null);
-        if (els.bookingDateChips) els.bookingDateChips.innerHTML = "";
         if (els.bookingWeeklyGrid) els.bookingWeeklyGrid.innerHTML = "";
         if (els.bookingEmptyState) {
             els.bookingEmptyState.hidden = false;
@@ -523,8 +503,6 @@ async function renderBookingCalendar() {
         ? state.visibleDateKey
         : (days.find((day) => day.slots.length)?.dateKey || days[0]?.dateKey || "");
     state.visibleDateKey = fallbackVisibleDate;
-
-    renderDateChips(days);
 
     if (els.bookingWeekLabel) {
         const weekEnd = new Date(weekStart);
@@ -658,8 +636,12 @@ async function cancelStudentBooking(bookingId) {
     if (Number(booking.slot || 0) - Date.now() < STUDENT_CHANGE_CUTOFF_MS) {
         throw new Error("You cannot cancel less than 12 hours before the lesson.");
     }
-    if (booking.googleCalendarEventId && typeof window.deleteBookingViaAppsScript === "function") {
-        const result = await window.deleteBookingViaAppsScript({ eventId: booking.googleCalendarEventId });
+    if ((booking.googleCalendarEventId || bookingId) && typeof window.deleteBookingViaAppsScript === "function") {
+        const result = await window.deleteBookingViaAppsScript({
+            eventId: booking.googleCalendarEventId,
+            bookingId,
+            slot: booking.slot || 0,
+        });
         if (result?.success === false && !isAlreadyDeletedCalendarEvent(result)) {
             throw new Error(normalizeAppsScriptStudentError(result, "Could not remove this booking from Google Calendar."));
         }
@@ -728,8 +710,12 @@ async function rescheduleStudentBooking(bookingId, newSlot) {
     }
     const conflict = await findBookingConflict(newSlot, bookingDeps(), { excludeBookingId: bookingId });
     if (conflict) throw new Error("That time is no longer available.");
-    if (booking.googleCalendarEventId && typeof window.deleteBookingViaAppsScript === "function") {
-        const deleteResult = await window.deleteBookingViaAppsScript({ eventId: booking.googleCalendarEventId });
+    if ((booking.googleCalendarEventId || bookingId) && typeof window.deleteBookingViaAppsScript === "function") {
+        const deleteResult = await window.deleteBookingViaAppsScript({
+            eventId: booking.googleCalendarEventId,
+            bookingId,
+            slot: booking.slot || 0,
+        });
         if (deleteResult?.success === false && !isAlreadyDeletedCalendarEvent(deleteResult)) {
             throw new Error(normalizeAppsScriptStudentError(deleteResult, "Could not remove the old Google Calendar event."));
         }

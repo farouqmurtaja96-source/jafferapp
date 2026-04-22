@@ -98,6 +98,35 @@ function listEvents_(calendarId, start, end) {
   });
 }
 
+function findBookingEvent_(cal, eventId, bookingId, slot) {
+  if (eventId) {
+    try {
+      const event = cal.getEventById(eventId);
+      if (event) return event;
+    } catch (err) {}
+  }
+  if (!bookingId) return null;
+
+  const center = slot ? new Date(Number(slot)) : new Date();
+  const start = new Date(center.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const end = new Date(center.getTime() + 180 * 24 * 60 * 60 * 1000);
+  const needle = 'Booking ID: ' + bookingId;
+  let events = [];
+  try {
+    events = cal.getEvents(start, end, { search: needle });
+  } catch (err) {
+    events = cal.getEvents(start, end);
+  }
+
+  for (var i = 0; i < events.length; i += 1) {
+    const description = events[i].getDescription() || '';
+    if (description.indexOf(needle) !== -1) {
+      return events[i];
+    }
+  }
+  return null;
+}
+
 function buildBusyBlocks_(events, timeZone) {
   return events.map(function (event) {
     const start = new Date(event.start);
@@ -246,8 +275,10 @@ function handleRequest_(e) {
 
     if (action === 'deleteBooking') {
       const eventId = req.eventId || '';
-      if (!eventId) {
-        return jsonOut({ success: false, message: 'Missing Google Calendar event ID.' });
+      const bookingId = req.bookingId || '';
+      const slot = Number(req.slot || 0);
+      if (!eventId && !bookingId) {
+        return jsonOut({ success: false, message: 'Missing Google Calendar event ID or booking ID.' });
       }
       const cal = CalendarApp.getCalendarById(config.primaryCalendarId);
       if (!cal) {
@@ -255,7 +286,7 @@ function handleRequest_(e) {
       }
       var event = null;
       try {
-        event = cal.getEventById(eventId);
+        event = findBookingEvent_(cal, eventId, bookingId, slot);
       } catch (eventLookupErr) {
         return jsonOut({
           success: true,
