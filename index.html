@@ -43,25 +43,16 @@
     <main class="site-shell">
         <section id="welcome-screen" class="app-screen app-screen--active">
             <div class="welcome-gate">
-                <div class="welcome-gate__copy">
-                    <p class="eyebrow">Lesson Booking</p>
-                    <h1>Choose how you want to continue</h1>
-                    <p class="section-copy">
-                        Students can create an account or sign in to book a lesson. Teachers can only enter with an approved teacher account.
-                    </p>
-                </div>
-                <div class="welcome-actions">
-                    <button class="welcome-card" id="openStudentGateBtn" type="button">
-                        <span class="welcome-card__kicker">Student</span>
-                        <strong>Student Sign In / Create Account</strong>
-                        <span>Book lessons and view your bookings.</span>
-                    </button>
-                    <button class="welcome-card welcome-card--teacher" id="openTeacherGateBtn" type="button">
-                        <span class="welcome-card__kicker">Teacher</span>
-                        <strong>Teacher Login</strong>
-                        <span>Manage availability, calendar sync, and bookings.</span>
-                    </button>
-                </div>
+                <section class="welcome-hero">
+                    <div class="welcome-panel">
+                        <p class="eyebrow">Lesson Booking</p>
+                        <h1>Welcome</h1>
+                        <div class="welcome-actions">
+                            <button class="welcome-card" id="openStudentGateBtn" type="button">Student Login / Sign Up</button>
+                            <button class="welcome-card welcome-card--teacher" id="openTeacherGateBtn" type="button">Teacher Login</button>
+                        </div>
+                    </div>
+                </section>
             </div>
         </section>
 
@@ -76,41 +67,13 @@
                 </div>
             </div>
 
-            <article class="panel student-auth-card" id="studentAuthPanel">
-                <div class="panel__head">
-                    <div>
-                        <h3>Student Account</h3>
-                        <p class="small-note" id="studentAuthHint">Create an account or sign in before booking.</p>
-                    </div>
-                    <div class="auth-badge" id="studentAuthBadge">Signed out</div>
+            <div class="student-session-bar">
+                <div>
+                    <strong id="studentAuthBadge">Signed out</strong>
+                    <p class="small-note" id="studentAuthHint">Sign in to book a lesson.</p>
                 </div>
-
-                <form id="studentAuthForm" class="form-stack">
-                    <div class="student-auth-toggle">
-                        <button type="button" class="btn btn--primary btn--small" id="studentLoginModeBtn">Sign In</button>
-                        <button type="button" class="btn btn--outline btn--small" id="studentSignupModeBtn">Create Account</button>
-                    </div>
-                    <label class="field" id="studentNameField" hidden>
-                        <span>Full Name</span>
-                        <input id="studentName" type="text" placeholder="Enter your full name" />
-                    </label>
-                    <div class="form-grid">
-                        <label class="field">
-                            <span>Email Address</span>
-                            <input id="studentEmail" type="email" placeholder="student@example.com" required />
-                        </label>
-                        <label class="field">
-                            <span>Password</span>
-                            <input id="studentPassword" type="password" placeholder="Password" required />
-                        </label>
-                    </div>
-                    <div class="action-row">
-                        <button type="submit" class="btn btn--primary" id="studentAuthSubmit">Sign In</button>
-                        <button type="button" class="btn btn--ghost" id="studentLogoutBtn" hidden>Sign Out</button>
-                    </div>
-                    <p id="studentAuthMsg" class="status-line"></p>
-                </form>
-            </article>
+                <button type="button" class="btn btn--ghost btn--small" id="studentLogoutBtn" hidden>Sign Out</button>
+            </div>
 
             <div class="student-layout">
                 <article class="panel panel--schedule">
@@ -376,6 +339,51 @@
                     <button type="submit" class="btn btn--primary">Sign In</button>
                 </div>
                 <p id="teacherLoginMsg" class="status-line"></p>
+            </form>
+        </div>
+    </div>
+
+    <div id="studentAuthModal" class="modal">
+        <div class="modal__backdrop" data-close-student-modal></div>
+        <div class="modal__body">
+            <button class="modal__close" data-close-student-modal type="button">&times;</button>
+            <h3>Student Access</h3>
+            <p class="small-note">Sign in or create an account to book your lesson.</p>
+            <form id="studentAuthForm" class="form-stack is-login-mode">
+                <div class="student-auth-toggle">
+                    <button type="button" class="btn btn--primary btn--small" id="studentLoginModeBtn">Sign In</button>
+                    <button type="button" class="btn btn--outline btn--small" id="studentSignupModeBtn">Create Account</button>
+                </div>
+                <label class="field" id="studentNameField" hidden>
+                    <span>Full Name</span>
+                    <input id="studentName" type="text" placeholder="Enter your full name" />
+                </label>
+                <label class="field" id="studentPhoneField" hidden>
+                    <span>Mobile / WhatsApp</span>
+                    <div class="phone-row">
+                        <select id="studentPhoneCountry" aria-label="Country code">
+                            <option value="+970">Palestine (+970)</option>
+                            <option value="+962">Jordan (+962)</option>
+                            <option value="+20">Egypt (+20)</option>
+                            <option value="+966">Saudi Arabia (+966)</option>
+                            <option value="+971">UAE (+971)</option>
+                            <option value="+974">Qatar (+974)</option>
+                            <option value="+44">UK (+44)</option>
+                            <option value="+1">USA / Canada (+1)</option>
+                        </select>
+                        <input id="studentPhone" type="tel" inputmode="tel" placeholder="Mobile number" />
+                    </div>
+                </label>
+                <label class="field">
+                    <span>Email Address</span>
+                    <input id="studentEmail" type="email" placeholder="student@example.com" required />
+                </label>
+                <label class="field">
+                    <span>Password</span>
+                    <input id="studentPassword" type="password" placeholder="Password" required />
+                </label>
+                <button type="submit" class="btn btn--primary btn--full" id="studentAuthSubmit">Sign In</button>
+                <p id="studentAuthMsg" class="status-line"></p>
             </form>
         </div>
     </div>

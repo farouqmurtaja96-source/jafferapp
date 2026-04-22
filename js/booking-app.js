@@ -78,7 +78,7 @@ function cacheDom() {
         "bookingWebsite",
         "bookingSubmit",
         "bookingMsg",
-        "studentAuthPanel",
+        "studentAuthModal",
         "studentAuthForm",
         "studentAuthHint",
         "studentAuthBadge",
@@ -86,6 +86,9 @@ function cacheDom() {
         "studentSignupModeBtn",
         "studentNameField",
         "studentName",
+        "studentPhoneField",
+        "studentPhoneCountry",
+        "studentPhone",
         "studentEmail",
         "studentPassword",
         "studentAuthSubmit",
@@ -247,8 +250,8 @@ function hashEmail(email) {
 }
 
 function normalizePhoneNumber() {
-    const prefix = (els.bookingPhoneCountry?.value || "").trim();
-    const raw = (els.bookingPhone?.value || "").replace(/[^0-9]/g, "");
+    const prefix = (els.studentPhoneCountry?.value || "").trim();
+    const raw = (els.studentPhone?.value || "").replace(/[^0-9]/g, "");
     if (!raw) return "";
     const local = raw.replace(/^0+/, "");
     return `${prefix}${local}`;
@@ -262,6 +265,10 @@ function getStudentName() {
     return (state.studentProfile?.name || state.currentUser?.displayName || "Student").trim();
 }
 
+function getStudentPhone() {
+    return (state.studentProfile?.phone || "").trim();
+}
+
 function updateBookingSubmitState() {
     if (!els.bookingSubmit) return;
     els.bookingSubmit.disabled = !state.selectedSlotMs || !isStudentSignedIn();
@@ -269,8 +276,15 @@ function updateBookingSubmitState() {
 
 function setStudentAuthMode(mode) {
     state.studentAuthMode = mode === "signup" ? "signup" : "login";
+    if (els.studentAuthForm) {
+        els.studentAuthForm.classList.toggle("is-signup-mode", state.studentAuthMode === "signup");
+        els.studentAuthForm.classList.toggle("is-login-mode", state.studentAuthMode !== "signup");
+    }
     if (els.studentNameField) {
         els.studentNameField.hidden = state.studentAuthMode !== "signup";
+    }
+    if (els.studentPhoneField) {
+        els.studentPhoneField.hidden = state.studentAuthMode !== "signup";
     }
     if (els.studentAuthSubmit) {
         els.studentAuthSubmit.textContent = state.studentAuthMode === "signup" ? "Create Account" : "Sign In";
@@ -296,9 +310,6 @@ function updateStudentAuthUi() {
         els.bookingAccountSummary.textContent = signedIn
             ? `Booking as ${getStudentName()} (${state.currentUser.email || ""}).`
             : "Sign in, choose a time, then confirm your lesson.";
-    }
-    if (els.studentAuthForm) {
-        els.studentAuthForm.classList.toggle("is-signed-in", signedIn);
     }
     if (els.studentLogoutBtn) {
         els.studentLogoutBtn.hidden = !signedIn;
@@ -576,10 +587,12 @@ function wireStudentActions() {
     });
 
     els.openStudentGateBtn?.addEventListener("click", () => {
-        showScreen("student-screen");
-        window.setTimeout(() => {
-            els.studentAuthPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 80);
+        if (isStudentSignedIn()) {
+            showScreen("student-screen");
+            return;
+        }
+        els.studentAuthModal?.classList.add("modal--open");
+        setStatus(els.studentAuthMsg, "");
     });
 
     els.openTeacherGateBtn?.addEventListener("click", () => {
@@ -603,6 +616,7 @@ function wireStudentActions() {
         const email = (els.studentEmail?.value || "").trim().toLowerCase();
         const password = els.studentPassword?.value || "";
         const name = (els.studentName?.value || "").trim().slice(0, 100);
+        const phone = normalizePhoneNumber();
         try {
             setStatus(els.studentAuthMsg, state.studentAuthMode === "signup" ? "Creating account..." : "Signing in...");
             if (state.studentAuthMode === "signup") {
@@ -610,19 +624,28 @@ function wireStudentActions() {
                     setStatus(els.studentAuthMsg, "Please enter your full name.", "error");
                     return;
                 }
+                if (!phone) {
+                    setStatus(els.studentAuthMsg, "Please enter your mobile number.", "error");
+                    return;
+                }
                 const cred = await window.auth.createUserWithEmailAndPassword(email, password);
                 await cred.user.updateProfile({ displayName: name });
                 await window.db.collection("users").doc(cred.user.uid).set({
                     email,
                     name,
+                    phone,
                     role: "student",
                     createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
                 });
                 setStatus(els.studentAuthMsg, "Account created. You can book now.", "success");
+                els.studentAuthModal?.classList.remove("modal--open");
+                showScreen("student-screen");
             } else {
                 await window.auth.signInWithEmailAndPassword(email, password);
                 setStatus(els.studentAuthMsg, "Signed in.", "success");
+                els.studentAuthModal?.classList.remove("modal--open");
+                showScreen("student-screen");
             }
         } catch (error) {
             setStatus(els.studentAuthMsg, error.message || "Student sign-in failed.", "error");
@@ -695,15 +718,22 @@ function wireStudentActions() {
         });
     });
 
+    document.querySelectorAll("[data-close-student-modal]").forEach((button) => {
+        button.addEventListener("click", () => {
+            els.studentAuthModal?.classList.remove("modal--open");
+        });
+    });
+
     els.bookingForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (!isStudentSignedIn()) {
             setStatus(els.bookingMsg, "Please sign in as a student before booking.", "error");
-            els.studentAuthPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
+            els.studentAuthModal?.classList.add("modal--open");
             return;
         }
         const email = (state.currentUser.email || "").trim().toLowerCase();
         const name = getStudentName();
+        const phone = getStudentPhone();
 
         await submitGuestBooking({
             db: window.db,
@@ -715,7 +745,7 @@ function wireStudentActions() {
             formValues: {
                 name,
                 email,
-                phone: "",
+                phone,
                 notes: "",
                 reasonLabels: [],
                 reason: "",

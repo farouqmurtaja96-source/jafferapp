@@ -45,12 +45,14 @@ service cloud.firestore {
         request.resource.data.keys().hasOnly([
           'email',
           'name',
+          'phone',
           'role',
           'createdAt',
           'updatedAt'
         ]) &&
         request.resource.data.role == "student" &&
         isValidEmail(request.resource.data.email) &&
+        isValidPhone(request.resource.data.phone) &&
         request.resource.data.name is string &&
         request.resource.data.name.size() > 1;
       allow update: if ownsDoc(uid) &&
@@ -58,6 +60,7 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'email',
           'name',
+          'phone',
           'updatedAt'
         ]);
       allow delete: if false;

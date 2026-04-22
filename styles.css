@@ -190,71 +190,91 @@ main.site-shell {
 .welcome-gate {
     min-height: calc(100vh - 130px);
     display: grid;
-    align-content: center;
-    gap: 26px;
-    padding: 34px 0 52px;
+    place-items: center;
+    padding: 32px 0 54px;
 }
 
-.welcome-gate__copy {
-    max-width: 760px;
+.welcome-hero {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: min(980px, 100%);
+    min-height: 560px;
+    padding: clamp(24px, 5vw, 54px);
+    border: 1px solid rgba(91, 100, 113, 0.13);
+    border-radius: 38px;
+    overflow: hidden;
+    background:
+        linear-gradient(rgba(19, 30, 42, 0.4), rgba(19, 30, 42, 0.28)),
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.38), transparent 36%),
+        radial-gradient(circle at bottom right, rgba(194, 65, 12, 0.34), transparent 34%),
+        url("https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80");
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 28px 70px rgba(31, 41, 55, 0.18);
+}
+
+.welcome-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 253, 249, 0.18), rgba(255, 253, 249, 0.08));
+    pointer-events: none;
 }
 
 .welcome-gate h1 {
-    margin: 8px 0 12px;
-    font-size: clamp(2.35rem, 6vw, 5.4rem);
-    line-height: 0.95;
-    letter-spacing: -0.055em;
+    margin: 8px 0 28px;
+    color: #fffdf9;
+    font-size: clamp(3rem, 9vw, 6rem);
+    line-height: 0.92;
+    letter-spacing: -0.07em;
+    text-shadow: 0 16px 44px rgba(15, 23, 42, 0.34);
+}
+
+.welcome-panel {
+    position: relative;
+    z-index: 1;
+    width: min(520px, 100%);
+    padding: clamp(24px, 4vw, 38px);
+    border-radius: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    background: rgba(20, 28, 38, 0.34);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+    backdrop-filter: blur(16px);
+    text-align: center;
+}
+
+.welcome-panel .eyebrow {
+    color: rgba(255, 253, 249, 0.82);
 }
 
 .welcome-actions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
+    gap: 12px;
 }
 
 .welcome-card {
-    display: grid;
-    gap: 12px;
-    min-height: 230px;
-    padding: 28px;
-    text-align: left;
-    border-radius: 32px;
-    border: 1px solid rgba(15, 118, 110, 0.18);
-    background:
-        radial-gradient(circle at top right, rgba(15, 118, 110, 0.2), transparent 34%),
-        linear-gradient(135deg, rgba(255, 253, 249, 0.98), rgba(237, 247, 244, 0.92));
-    box-shadow: var(--shadow);
+    min-height: 0;
+    padding: 16px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    background: rgba(255, 253, 249, 0.94);
     color: var(--ink);
+    font-weight: 800;
+    text-align: center;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.welcome-card:hover {
+    transform: translateY(-3px);
+    background: #fff;
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.22);
 }
 
 .welcome-card--teacher {
-    border-color: rgba(194, 65, 12, 0.2);
-    background:
-        radial-gradient(circle at top right, rgba(194, 65, 12, 0.2), transparent 34%),
-        linear-gradient(135deg, rgba(255, 253, 249, 0.98), rgba(255, 241, 232, 0.92));
-}
-
-.welcome-card strong {
-    font-size: clamp(1.45rem, 2.6vw, 2.35rem);
-    line-height: 1;
-}
-
-.welcome-card span:last-child {
-    color: var(--muted);
-    font-size: 1rem;
-}
-
-.welcome-card__kicker {
-    width: fit-content;
-    padding: 8px 12px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(91, 100, 113, 0.12);
-    color: var(--primary-dark);
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
+    background: rgba(20, 28, 38, 0.74);
+    color: #fffdf9;
 }
 
 .student-layout {
@@ -272,10 +292,14 @@ main.site-shell {
     flex-wrap: wrap;
 }
 
-.student-auth-card .form-stack.is-signed-in .field,
-.student-auth-card .form-stack.is-signed-in .student-auth-toggle,
-.student-auth-card .form-stack.is-signed-in #studentAuthSubmit {
+#studentAuthForm.is-login-mode #studentNameField,
+#studentAuthForm.is-login-mode #studentPhoneField {
     display: none;
+}
+
+#studentAuthForm.is-signup-mode #studentNameField,
+#studentAuthForm.is-signup-mode #studentPhoneField {
+    display: grid;
 }
 
 .teacher-banner {
@@ -294,6 +318,23 @@ main.site-shell {
 .student-stack {
     display: grid;
     gap: 20px;
+}
+
+.student-session-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding: 16px 18px;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: rgba(255, 253, 249, 0.78);
+    box-shadow: var(--shadow-soft);
+}
+
+.student-session-bar strong {
+    display: block;
 }
 
 .grid-two--teacher {
@@ -868,6 +909,31 @@ main.site-shell {
         display: grid;
     }
 
+    .welcome-gate {
+        min-height: auto;
+        padding: 18px 0 38px;
+    }
+
+    .welcome-hero {
+        padding: 22px;
+        border-radius: 30px;
+        min-height: 520px;
+    }
+
+    .welcome-gate h1 {
+        font-size: clamp(2.35rem, 13vw, 4.1rem);
+        letter-spacing: -0.06em;
+    }
+
+    .welcome-panel {
+        padding: 12px;
+        border-radius: 26px;
+    }
+
+    .welcome-card {
+        padding: 15px 18px;
+    }
+
     .phone-row,
     .inline-fields,
     .status-check,
@@ -890,6 +956,11 @@ main.site-shell {
     .site-nav,
     .action-row {
         width: 100%;
+    }
+
+    .student-session-bar {
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .site-nav .nav-link,
