@@ -110,6 +110,7 @@ export async function cancelBooking({ db, firebase, bookingId }) {
     await db.collection("bookings").doc(bookingId).set(
         {
             status: "canceled",
+            calendarSynced: false,
             canceledAt: Date.now(),
             history: firebase.firestore.FieldValue.arrayUnion({
                 at: Date.now(),
@@ -123,6 +124,7 @@ export async function cancelBooking({ db, firebase, bookingId }) {
         {
             status: "canceled",
             updatedAt: Date.now(),
+            calendarSynced: false,
         },
         { merge: true }
     );
@@ -134,6 +136,8 @@ export async function rescheduleBooking({
     bookingId,
     booking,
     newSlot,
+    calendarSynced = false,
+    googleCalendarEventId = null,
 }) {
     await db.collection("bookings").doc(bookingId).set(
         {
@@ -141,7 +145,8 @@ export async function rescheduleBooking({
             status: "rescheduled",
             rescheduledFrom: booking.slot,
             rescheduledAt: Date.now(),
-            calendarSynced: false,
+            calendarSynced,
+            googleCalendarEventId,
             history: firebase.firestore.FieldValue.arrayUnion({
                 at: Date.now(),
                 action: "rescheduled",
@@ -157,7 +162,7 @@ export async function rescheduleBooking({
             slot: newSlot,
             status: "rescheduled",
             updatedAt: Date.now(),
-            calendarSynced: false,
+            calendarSynced,
         },
         { merge: true }
     );

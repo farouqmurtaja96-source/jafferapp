@@ -222,37 +222,42 @@
                     </form>
                 </section>
 
-                <section class="teacher-editor__section">
-                    <h4>Busy Blocks (Specific Dates)</h4>
-                    <p class="teacher-edit-note">
-                        Add one-off busy times for a specific date. Imported calendar times are shown here too.
-                    </p>
-                    <form id="exceptionForm" class="form-stack">
-                        <div class="inline-fields">
+                <section class="teacher-editor__section teacher-editor__section--collapsible">
+                    <button type="button" class="section-toggle" id="exceptionToggle" aria-expanded="false" aria-controls="exceptionBody">
+                        <span>
+                            <span class="section-toggle__title">Busy Blocks (Specific Dates)</span>
+                            <span class="teacher-edit-note">Add one-off busy times. Imported calendar times appear here too.</span>
+                        </span>
+                        <span class="section-toggle__arrow" aria-hidden="true">v</span>
+                    </button>
+                    <div id="exceptionBody" class="collapsible-body" hidden>
+                        <form id="exceptionForm" class="form-stack">
+                            <div class="inline-fields">
+                                <label class="field">
+                                    <span>Date</span>
+                                    <input id="exceptionDate" type="date" required />
+                                </label>
+                                <label class="field">
+                                    <span>Start</span>
+                                    <input id="exceptionStart" type="time" required />
+                                </label>
+                                <label class="field">
+                                    <span>End</span>
+                                    <input id="exceptionEnd" type="time" required />
+                                </label>
+                            </div>
                             <label class="field">
-                                <span>Date</span>
-                                <input id="exceptionDate" type="date" required />
+                                <span>Note (Optional)</span>
+                                <input id="exceptionNote" type="text" placeholder="Meeting, travel, holiday..." />
                             </label>
-                            <label class="field">
-                                <span>Start</span>
-                                <input id="exceptionStart" type="time" required />
-                            </label>
-                            <label class="field">
-                                <span>End</span>
-                                <input id="exceptionEnd" type="time" required />
-                            </label>
-                        </div>
-                        <label class="field">
-                            <span>Note (Optional)</span>
-                            <input id="exceptionNote" type="text" placeholder="Meeting, travel, holiday..." />
-                        </label>
-                        <div class="action-row">
-                            <button type="submit" class="btn btn--primary">Add Busy Block</button>
-                            <button id="clearExceptionsBtn" type="button" class="btn btn--ghost">Clear Busy Blocks</button>
-                        </div>
-                        <p id="exceptionMsg" class="status-line"></p>
-                    </form>
-                    <div id="exceptionList" class="exception-list"></div>
+                            <div class="action-row">
+                                <button type="submit" class="btn btn--primary">Add Busy Block</button>
+                                <button id="clearExceptionsBtn" type="button" class="btn btn--ghost">Clear Busy Blocks</button>
+                            </div>
+                            <p id="exceptionMsg" class="status-line"></p>
+                        </form>
+                        <div id="exceptionList" class="exception-list"></div>
+                    </div>
                 </section>
 
                 <section class="teacher-editor__section">

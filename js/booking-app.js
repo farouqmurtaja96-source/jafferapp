@@ -138,6 +138,8 @@ function cacheDom() {
         "exceptionStart",
         "exceptionEnd",
         "exceptionNote",
+        "exceptionToggle",
+        "exceptionBody",
         "exceptionList",
         "exceptionMsg",
         "clearExceptionsBtn",
@@ -768,6 +770,36 @@ async function rescheduleStudentBooking(bookingId, newSlot) {
     }, { merge: true });
 }
 
+async function deleteCalendarEventForBooking(bookingId, booking) {
+    if (typeof window.deleteBookingViaAppsScript !== "function") {
+        return { success: false, message: "Apps Script is not available." };
+    }
+    return window.deleteBookingViaAppsScript({
+        eventId: booking.googleCalendarEventId || "",
+        bookingId,
+        slot: booking.slot || 0,
+    });
+}
+
+async function createCalendarEventForBooking(bookingId, booking, slot) {
+    if (typeof window.createBookingViaAppsScript !== "function") {
+        return { success: false, message: "Apps Script is not available." };
+    }
+    return window.createBookingViaAppsScript({
+        bookingId,
+        slot,
+        durationMinutes: 50,
+        timeZone: state.bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
+        teacherEmail: (state.contactSettings?.email || "").trim(),
+        name: booking.name || "Student",
+        email: booking.email || "",
+        phone: booking.phone || "",
+        notes: booking.notes || "",
+        studentTimeZone: booking.studentTimeZone || getLocalTimezone(),
+        studentLocale: booking.studentLocale || navigator.language || "",
+    });
+}
+
 function wireStudentActions() {
     document.querySelectorAll("[data-target]").forEach((button) => {
         button.addEventListener("click", () => showScreen(button.getAttribute("data-target")));
@@ -1295,6 +1327,14 @@ function wireTeacherActions() {
         els.exceptionForm.reset();
     });
 
+    els.exceptionToggle?.addEventListener("click", () => {
+        const expanded = els.exceptionToggle.getAttribute("aria-expanded") === "true";
+        els.exceptionToggle.setAttribute("aria-expanded", String(!expanded));
+        if (els.exceptionBody) {
+            els.exceptionBody.hidden = expanded;
+        }
+    });
+
     els.clearExceptionsBtn?.addEventListener("click", async () => {
         state.bookingSettings.exceptions = [];
         await saveTeacherSettings();
@@ -1331,6 +1371,10 @@ function wireTeacherActions() {
         const action = button.getAttribute("data-action");
         try {
             if (action === "cancel") {
+                const deleteResult = await deleteCalendarEventForBooking(bookingId, booking);
+                if (deleteResult?.success === false && !isAlreadyDeletedCalendarEvent(deleteResult)) {
+                    throw new Error(normalizeAppsScriptStudentError(deleteResult, "Could not remove this booking from Google Calendar."));
+                }
                 await cancelBooking({ db: window.db, firebase: window.firebase, bookingId });
                 setStatus(els.teacherBookingMsg, "Booking canceled.", "success");
                 await refreshTeacherBookings();
@@ -1363,12 +1407,22 @@ function wireTeacherActions() {
                     setStatus(els.teacherBookingMsg, "That slot is already taken.", "error");
                     return;
                 }
+                const deleteResult = await deleteCalendarEventForBooking(bookingId, booking);
+                if (deleteResult?.success === false && !isAlreadyDeletedCalendarEvent(deleteResult)) {
+                    throw new Error(normalizeAppsScriptStudentError(deleteResult, "Could not remove the old Google Calendar event."));
+                }
+                const createResult = await createCalendarEventForBooking(bookingId, booking, newSlot);
+                if (createResult?.success === false) {
+                    throw new Error(createResult.message || "Could not create the new Google Calendar event.");
+                }
                 await rescheduleBooking({
                     db: window.db,
                     firebase: window.firebase,
                     bookingId,
                     booking,
                     newSlot,
+                    calendarSynced: !!createResult?.success,
+                    googleCalendarEventId: createResult?.eventId || null,
                 });
                 setStatus(els.teacherBookingMsg, "Booking rescheduled.", "success");
                 await refreshTeacherBookings();
