@@ -23,6 +23,31 @@ const errorHandler = {
 };
 window.preplyCalendarId = null; // Will be set from Firebase or user input
 
+function loadExternalScript(src) {
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing?.dataset.loaded === "true") {
+            resolve();
+            return;
+        }
+        if (existing) {
+            existing.addEventListener("load", () => resolve(), { once: true });
+            existing.addEventListener("error", () => reject(new Error(`Could not load ${src}`)), { once: true });
+            return;
+        }
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.defer = true;
+        script.addEventListener("load", () => {
+            script.dataset.loaded = "true";
+            resolve();
+        }, { once: true });
+        script.addEventListener("error", () => reject(new Error(`Could not load ${src}`)), { once: true });
+        document.head.appendChild(script);
+    });
+}
+
 function normalizeCalendarId(value) {
     const raw = (value || "").trim();
     if (!raw) return "";
@@ -284,11 +309,8 @@ async function initializeGoogleCalendar() {
 // Load GAPI client
 function gapiLoaded() {
     return new Promise((resolve, reject) => {
-        if (!window.gapi?.load) {
-            reject(new Error('Google API client is not available'));
-            return;
-        }
-        gapi.load('client', () => {
+        const ready = () => window.gapi?.load;
+        const start = () => gapi.load('client', () => {
             try {
                 gapiInited = true;
                 resolve();
@@ -296,24 +318,43 @@ function gapiLoaded() {
                 reject(error);
             }
         });
+        if (ready()) {
+            start();
+            return;
+        }
+        loadExternalScript("https://apis.google.com/js/api.js")
+            .then(() => {
+                if (!ready()) throw new Error('Google API client is not available');
+                start();
+            })
+            .catch(reject);
     });
 }
 
 // Load GIS client
 function gisLoaded() {
     return new Promise((resolve, reject) => {
-        if (!window.google?.accounts?.oauth2?.initTokenClient) {
-            reject(new Error('Google Identity Services is not available'));
-            return;
-        }
-        tokenClient = google.accounts.oauth2.initTokenClient({
+        const ready = () => window.google?.accounts?.oauth2?.initTokenClient;
+        const start = () => {
+            tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: googleCalendarConfig.clientId,
             scope: googleCalendarConfig.scopes,
             callback: '', // defined later
             redirect_uri: googleCalendarConfig.redirectUri || (window.location.origin + window.location.pathname)
-        });
-        gisInited = true;
-        resolve();
+            });
+            gisInited = true;
+            resolve();
+        };
+        if (ready()) {
+            start();
+            return;
+        }
+        loadExternalScript("https://accounts.google.com/gsi/client")
+            .then(() => {
+                if (!ready()) throw new Error('Google Identity Services is not available');
+                start();
+            })
+            .catch(reject);
     });
 }
 

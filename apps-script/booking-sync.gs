@@ -253,11 +253,30 @@ function handleRequest_(e) {
       if (!cal) {
         return jsonOut({ success: false, message: 'Primary calendar not found.' });
       }
-      const event = cal.getEventById(eventId);
+      var event = null;
+      try {
+        event = cal.getEventById(eventId);
+      } catch (eventLookupErr) {
+        return jsonOut({
+          success: true,
+          message: 'Calendar event was already removed.',
+          alreadyDeleted: true,
+          ignoredError: eventLookupErr && eventLookupErr.message ? eventLookupErr.message : String(eventLookupErr),
+        });
+      }
       if (!event) {
         return jsonOut({ success: true, message: 'Calendar event was already removed.' });
       }
-      event.deleteEvent();
+      try {
+        event.deleteEvent();
+      } catch (deleteErr) {
+        return jsonOut({
+          success: true,
+          message: 'Calendar event was already removed.',
+          alreadyDeleted: true,
+          ignoredError: deleteErr && deleteErr.message ? deleteErr.message : String(deleteErr),
+        });
+      }
       return jsonOut({ success: true, message: 'Calendar event deleted.' });
     }
 

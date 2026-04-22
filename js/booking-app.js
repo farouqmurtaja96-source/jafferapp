@@ -236,6 +236,26 @@ function setButtonLoading(button, loading, loadingText = "") {
     button.classList.remove("is-loading");
 }
 
+function normalizeAppsScriptStudentError(result, fallbackMessage) {
+    const message = String(result?.message || "");
+    if (message.toLowerCase().includes("unknown action")) {
+        return "Apps Script needs a new deployment before students can cancel or reschedule.";
+    }
+    return message || fallbackMessage;
+}
+
+function isAlreadyDeletedCalendarEvent(result) {
+    const message = [
+        result?.message,
+        result?.error,
+        result?.ignoredError,
+    ].filter(Boolean).join(" ").toLowerCase();
+    return Boolean(result?.alreadyDeleted)
+        || message.includes("already removed")
+        || message.includes("already been deleted")
+        || message.includes("does not exist");
+}
+
 function getLocalTimezone() {
     try {
         return Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TIMEZONE;
@@ -640,8 +660,8 @@ async function cancelStudentBooking(bookingId) {
     }
     if (booking.googleCalendarEventId && typeof window.deleteBookingViaAppsScript === "function") {
         const result = await window.deleteBookingViaAppsScript({ eventId: booking.googleCalendarEventId });
-        if (result?.success === false) {
-            throw new Error(result.message || "Could not remove this booking from Google Calendar.");
+        if (result?.success === false && !isAlreadyDeletedCalendarEvent(result)) {
+            throw new Error(normalizeAppsScriptStudentError(result, "Could not remove this booking from Google Calendar."));
         }
     }
     await window.db.collection("bookings").doc(bookingId).set({
@@ -710,8 +730,8 @@ async function rescheduleStudentBooking(bookingId, newSlot) {
     if (conflict) throw new Error("That time is no longer available.");
     if (booking.googleCalendarEventId && typeof window.deleteBookingViaAppsScript === "function") {
         const deleteResult = await window.deleteBookingViaAppsScript({ eventId: booking.googleCalendarEventId });
-        if (deleteResult?.success === false) {
-            throw new Error(deleteResult.message || "Could not remove the old Google Calendar event.");
+        if (deleteResult?.success === false && !isAlreadyDeletedCalendarEvent(deleteResult)) {
+            throw new Error(normalizeAppsScriptStudentError(deleteResult, "Could not remove the old Google Calendar event."));
         }
     }
     let calendarSynced = false;
