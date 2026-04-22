@@ -6,7 +6,7 @@
     <title>Lesson Booking Studio</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; script-src-elem 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://www.google.com https://firestore.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://content.googleapis.com https://script.google.com https://script.googleusercontent.com https://api.emailjs.com; frame-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://palestinian-arabic-lab.firebaseapp.com; child-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://palestinian-arabic-lab.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; script-src-elem 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://www.google.com https://firestore.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://content.googleapis.com https://script.google.com https://script.googleusercontent.com https://api.emailjs.com; frame-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://jafferapp.firebaseapp.com; child-src https://www.google.com https://www.gstatic.com https://content.googleapis.com https://jafferapp.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="icon"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f172a'/%3E%3Ctext x='32' y='41' font-size='26' text-anchor='middle' fill='%23f8fafc' font-family='Arial, sans-serif'%3ELS%3C/text%3E%3C/svg%3E" />
@@ -14,7 +14,6 @@
     <script src="./js/config.runtime.js"></script>
     <script src="./js/config.js"></script>
     <script src="./js/google-calendar.js"></script>
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <script src="https://apis.google.com/js/api.js"
         onload="window.handleClientLoad && window.handleClientLoad()"
         onerror="console.error('Error loading GAPI')"></script>
@@ -47,10 +46,46 @@
                     <p class="eyebrow">Student</p>
                     <h2>Book an available lesson</h2>
                     <p class="section-copy">
-                        Pick a free slot, enter your details, and confirm your booking.
+                        Sign in once, pick a free slot, and confirm your lesson.
                     </p>
                 </div>
             </div>
+
+            <article class="panel student-auth-card" id="studentAuthPanel">
+                <div class="panel__head">
+                    <div>
+                        <h3>Student Account</h3>
+                        <p class="small-note" id="studentAuthHint">Create an account or sign in before booking.</p>
+                    </div>
+                    <div class="auth-badge" id="studentAuthBadge">Signed out</div>
+                </div>
+
+                <form id="studentAuthForm" class="form-stack">
+                    <div class="student-auth-toggle">
+                        <button type="button" class="btn btn--primary btn--small" id="studentLoginModeBtn">Sign In</button>
+                        <button type="button" class="btn btn--outline btn--small" id="studentSignupModeBtn">Create Account</button>
+                    </div>
+                    <label class="field" id="studentNameField" hidden>
+                        <span>Full Name</span>
+                        <input id="studentName" type="text" placeholder="Enter your full name" />
+                    </label>
+                    <div class="form-grid">
+                        <label class="field">
+                            <span>Email Address</span>
+                            <input id="studentEmail" type="email" placeholder="student@example.com" required />
+                        </label>
+                        <label class="field">
+                            <span>Password</span>
+                            <input id="studentPassword" type="password" placeholder="Password" required />
+                        </label>
+                    </div>
+                    <div class="action-row">
+                        <button type="submit" class="btn btn--primary" id="studentAuthSubmit">Sign In</button>
+                        <button type="button" class="btn btn--ghost" id="studentLogoutBtn" hidden>Sign Out</button>
+                    </div>
+                    <p id="studentAuthMsg" class="status-line"></p>
+                </form>
+            </article>
 
             <div class="student-layout">
                 <article class="panel panel--schedule">
@@ -82,48 +117,15 @@
                     <article class="panel panel--form">
                         <div class="panel__head">
                             <div>
-                                <h3>Your Details</h3>
-                                <p class="small-note">Fill in your details to reserve the selected slot.</p>
+                                <h3>Confirm Booking</h3>
+                                <p class="small-note" id="bookingAccountSummary">Sign in, choose a time, then confirm your lesson.</p>
                             </div>
                         </div>
 
                         <form id="bookingForm" class="form-stack">
                             <input type="hidden" id="bookingWebsite" autocomplete="off" />
-                            <div class="form-grid">
-                                <label class="field">
-                                    <span>Full Name</span>
-                                    <input id="bookingName" type="text" placeholder="Enter your full name" required />
-                                </label>
-                                <label class="field">
-                                    <span>Email Address</span>
-                                    <input id="bookingEmail" type="email" placeholder="Enter your email" required />
-                                </label>
-                            </div>
-                            <label class="field">
-                                <span>Mobile / WhatsApp</span>
-                                <div class="phone-row">
-                                    <select id="bookingPhoneCountry" aria-label="Country code">
-                                        <option value="+970">Palestine (+970)</option>
-                                        <option value="+962">Jordan (+962)</option>
-                                        <option value="+20">Egypt (+20)</option>
-                                        <option value="+966">Saudi Arabia (+966)</option>
-                                        <option value="+971">UAE (+971)</option>
-                                        <option value="+974">Qatar (+974)</option>
-                                        <option value="+44">UK (+44)</option>
-                                        <option value="+1">USA / Canada (+1)</option>
-                                    </select>
-                                    <input id="bookingPhone" type="tel" inputmode="tel" placeholder="Mobile number" required />
-                                </div>
-                            </label>
-                            <label class="field">
-                                <span>Notes</span>
-                                <textarea id="bookingNotes" rows="4" placeholder="Optional message for the teacher"></textarea>
-                            </label>
-                            <div class="field">
-                                <div class="g-recaptcha" data-sitekey="6LcLRrcsAAAAALQlPoVFVTbOuGPoqvKaCiniUMfV"></div>
-                            </div>
                             <button type="submit" class="btn btn--primary btn--full" id="bookingSubmit" disabled>
-                                <span class="btn__label">Book Now</span>
+                                <span class="btn__label">Confirm Selected Time</span>
                                 <span class="btn__spinner" aria-hidden="true"></span>
                             </button>
                             <p id="bookingMsg" class="status-line"></p>
@@ -136,13 +138,11 @@
                                 <div class="panel__head panel__head--compact">
                                     <div>
                                         <h3>Check Booking Status</h3>
-                                        <p class="small-note">Use your email to see your recent bookings.</p>
+                                        <p class="small-note">Your upcoming bookings appear here after signing in.</p>
                                     </div>
                                 </div>
-                                <div class="status-check">
-                                    <input id="bookingStatusEmail" type="email" placeholder="Enter your email" />
-                                    <button id="bookingStatusBtn" type="button" class="btn btn--outline">Check Status</button>
-                                </div>
+                                <button id="bookingStatusBtn" type="button" class="btn btn--outline">Refresh My Bookings</button>
+                                <input id="bookingStatusEmail" type="email" hidden />
                                 <div id="bookingStatusList" class="status-list"></div>
                                 <p id="bookingStatusMsg" class="status-line"></p>
                             </div>

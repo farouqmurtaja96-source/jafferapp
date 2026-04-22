@@ -27,8 +27,8 @@ service cloud.firestore {
     }
 
     function isValidPhone(phone) {
-      return phone is string &&
-        phone.matches('^[+]?[0-9]{8,15}$');
+      return phone == "" ||
+        (phone is string && phone.matches('^[+]?[0-9]{8,15}$'));
     }
 
     function isTimestampNumber(value) {
@@ -41,8 +41,25 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if ownsDoc(uid);
-      allow create: if false;
-      allow update: if false;
+      allow create: if ownsDoc(uid) &&
+        request.resource.data.keys().hasOnly([
+          'email',
+          'name',
+          'role',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.role == "student" &&
+        isValidEmail(request.resource.data.email) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 1;
+      allow update: if ownsDoc(uid) &&
+        resource.data.role == "student" &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'email',
+          'name',
+          'updatedAt'
+        ]);
       allow delete: if false;
     }
 
@@ -91,19 +108,22 @@ service cloud.firestore {
     match /publicBookings/{docId} {
       allow read: if true;
 
-      allow create: if request.resource.data.keys().hasOnly([
+      allow create: if signedIn() &&
+        request.resource.data.keys().hasOnly([
           'slot',
           'status',
           'emailHash',
           'createdAt',
           'updatedAt',
           'calendarSynced',
-          'source'
+          'source',
+          'studentUid'
         ]) &&
         isTimestampNumber(request.resource.data.slot) &&
         request.resource.data.emailHash is string &&
         request.resource.data.emailHash.size() >= 32 &&
-        request.resource.data.source == "guest" &&
+        request.resource.data.source == "student" &&
+        request.resource.data.studentUid == request.auth.uid &&
         request.resource.data.status == "booked";
 
       allow update: if isTeacher() &&
@@ -140,18 +160,22 @@ service cloud.firestore {
           'studentTimeZone',
           'studentLocale',
           'countryHint',
+          'studentUid',
           'timezone',
           'history'
         ]) &&
+        signedIn() &&
+        request.resource.data.studentUid == request.auth.uid &&
         request.resource.data.name is string &&
         request.resource.data.name.size() > 0 &&
         isValidEmail(request.resource.data.email) &&
         isValidPhone(request.resource.data.phone) &&
         isTimestampNumber(request.resource.data.slot) &&
         request.resource.data.status == "booked" &&
-        request.resource.data.source == "guest";
+        request.resource.data.source == "student";
 
-      allow read: if isTeacher();
+      allow read: if isTeacher() ||
+        (signedIn() && resource.data.studentUid == request.auth.uid);
 
       allow update: if isTeacher() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([

@@ -81,6 +81,7 @@ export async function submitGuestBooking({
         studentLocale,
         countryHint,
         recaptchaReady,
+        studentUid,
     } = formValues;
 
     if (!selectedDate || !selectedTime) {
@@ -99,8 +100,13 @@ export async function submitGuestBooking({
         return;
     }
 
-    if (!name || !email || !phone) {
-        if (bookingMsg) bookingMsg.textContent = "Please fill name, email, and phone.";
+    if (!studentUid) {
+        if (bookingMsg) bookingMsg.textContent = "Please sign in before booking.";
+        return;
+    }
+
+    if (!name || !email) {
+        if (bookingMsg) bookingMsg.textContent = "Your account is missing a name or email.";
         return;
     }
 
@@ -194,7 +200,8 @@ export async function submitGuestBooking({
             email,
             phone,
             notes: combinedNotes,
-            source: "guest",
+            source: "student",
+            studentUid,
             reason,
             reasonLabels,
             level,
@@ -223,10 +230,11 @@ export async function submitGuestBooking({
             slot: selectedSlot,
             status: "booked",
             emailHash,
+            studentUid,
             createdAt: Date.now(),
             updatedAt: Date.now(),
             calendarSynced,
-            source: "guest",
+            source: "student",
         });
 
         const emailSummary = [
@@ -334,7 +342,7 @@ export async function submitGuestBooking({
         if (bookingMsg) bookingMsg.textContent = "Booking failed. Please try again.";
     } finally {
         if (bookingSubmit) bookingSubmit.classList.remove("is-loading");
-        if (bookingSubmitLabel) bookingSubmitLabel.textContent = "Book Now";
+        if (bookingSubmitLabel) bookingSubmitLabel.textContent = "Confirm Selected Time";
         if (bookingSubmit && window.selectedDate && window.selectedTime) bookingSubmit.disabled = false;
     }
 }

@@ -192,6 +192,22 @@ main.site-shell {
     gap: 20px;
 }
 
+.student-auth-card {
+    margin-bottom: 20px;
+}
+
+.student-auth-toggle {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.student-auth-card .form-stack.is-signed-in .field,
+.student-auth-card .form-stack.is-signed-in .student-auth-toggle,
+.student-auth-card .form-stack.is-signed-in #studentAuthSubmit {
+    display: none;
+}
+
 .teacher-banner {
     border-radius: 30px;
     padding: 26px 28px;

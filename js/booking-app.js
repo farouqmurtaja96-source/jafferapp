@@ -44,6 +44,10 @@ const state = {
     selectedDateKey: "",
     visibleDateKey: "",
     bookingWeekOffset: 0,
+    currentUser: null,
+    currentRole: "",
+    studentProfile: null,
+    studentAuthMode: "login",
     teacherUser: null,
     teacherRole: "",
     bookingCache: new Map(),
@@ -70,14 +74,23 @@ function cacheDom() {
         "bookingInfo",
         "selectedTimeDisplay",
         "bookingForm",
-        "bookingName",
-        "bookingEmail",
-        "bookingPhoneCountry",
-        "bookingPhone",
-        "bookingNotes",
+        "bookingAccountSummary",
         "bookingWebsite",
         "bookingSubmit",
         "bookingMsg",
+        "studentAuthPanel",
+        "studentAuthForm",
+        "studentAuthHint",
+        "studentAuthBadge",
+        "studentLoginModeBtn",
+        "studentSignupModeBtn",
+        "studentNameField",
+        "studentName",
+        "studentEmail",
+        "studentPassword",
+        "studentAuthSubmit",
+        "studentLogoutBtn",
+        "studentAuthMsg",
         "bookingStatusEmail",
         "bookingStatusBtn",
         "bookingStatusList",
@@ -239,6 +252,58 @@ function normalizePhoneNumber() {
     return `${prefix}${local}`;
 }
 
+function isStudentSignedIn() {
+    return Boolean(state.currentUser && state.currentRole === "student");
+}
+
+function getStudentName() {
+    return (state.studentProfile?.name || state.currentUser?.displayName || "Student").trim();
+}
+
+function updateBookingSubmitState() {
+    if (!els.bookingSubmit) return;
+    els.bookingSubmit.disabled = !state.selectedSlotMs || !isStudentSignedIn();
+}
+
+function setStudentAuthMode(mode) {
+    state.studentAuthMode = mode === "signup" ? "signup" : "login";
+    if (els.studentNameField) {
+        els.studentNameField.hidden = state.studentAuthMode !== "signup";
+    }
+    if (els.studentAuthSubmit) {
+        els.studentAuthSubmit.textContent = state.studentAuthMode === "signup" ? "Create Account" : "Sign In";
+    }
+    els.studentLoginModeBtn?.classList.toggle("btn--primary", state.studentAuthMode === "login");
+    els.studentLoginModeBtn?.classList.toggle("btn--outline", state.studentAuthMode !== "login");
+    els.studentSignupModeBtn?.classList.toggle("btn--primary", state.studentAuthMode === "signup");
+    els.studentSignupModeBtn?.classList.toggle("btn--outline", state.studentAuthMode !== "signup");
+    setStatus(els.studentAuthMsg, "");
+}
+
+function updateStudentAuthUi() {
+    const signedIn = isStudentSignedIn();
+    if (els.studentAuthBadge) {
+        els.studentAuthBadge.textContent = signedIn ? (state.currentUser.email || "Student") : "Signed out";
+    }
+    if (els.studentAuthHint) {
+        els.studentAuthHint.textContent = signedIn
+            ? `Ready to book as ${getStudentName()}.`
+            : "Create an account or sign in before booking.";
+    }
+    if (els.bookingAccountSummary) {
+        els.bookingAccountSummary.textContent = signedIn
+            ? `Booking as ${getStudentName()} (${state.currentUser.email || ""}).`
+            : "Sign in, choose a time, then confirm your lesson.";
+    }
+    if (els.studentAuthForm) {
+        els.studentAuthForm.classList.toggle("is-signed-in", signedIn);
+    }
+    if (els.studentLogoutBtn) {
+        els.studentLogoutBtn.hidden = !signedIn;
+    }
+    updateBookingSubmitState();
+}
+
 function getWeekStart(offset = 0) {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
@@ -264,10 +329,10 @@ function setSelectedSlot(slotMs) {
             dateStyle: "full",
             timeStyle: "short",
         });
-        els.bookingSubmit.disabled = false;
+        updateBookingSubmitState();
     } else if (els.bookingInfo) {
         els.bookingInfo.hidden = true;
-        if (els.bookingSubmit) els.bookingSubmit.disabled = true;
+        updateBookingSubmitState();
     }
 }
 
@@ -452,6 +517,10 @@ async function renderBookingCalendar() {
 }
 
 async function loadBookingStatus(email) {
+    if (state.currentUser) {
+        await loadStudentBookings();
+        return;
+    }
     await loadBookingStatusByEmail({
         db: window.db,
         email,
@@ -463,9 +532,88 @@ async function loadBookingStatus(email) {
     });
 }
 
+async function loadStudentBookings() {
+    if (!els.bookingStatusList) return;
+    els.bookingStatusList.innerHTML = "";
+    if (!state.currentUser || state.currentRole !== "student") {
+        els.bookingStatusList.innerHTML = "<div class=\"small-note\">Sign in to see your bookings.</div>";
+        return;
+    }
+    try {
+        const snap = await window.db
+            .collection("bookings")
+            .where("studentUid", "==", state.currentUser.uid)
+            .limit(10)
+            .get();
+        const rows = [];
+        snap.forEach((doc) => rows.push({ id: doc.id, ...(doc.data() || {}) }));
+        rows.sort((a, b) => (b.slot || 0) - (a.slot || 0));
+        if (!rows.length) {
+            els.bookingStatusList.innerHTML = "<div class=\"small-note\">No bookings yet.</div>";
+            return;
+        }
+        els.bookingStatusList.innerHTML = rows.map((b) => {
+            const status = (b.status || "booked").toLowerCase();
+            const label = status === "canceled" ? "Canceled" : status === "rescheduled" ? "Rescheduled" : "Booked";
+            return `
+                <div class="booking-status-item">
+                    <div><strong>${escapeHtml(formatSlotTime(b.slot))}</strong></div>
+                    <div>Status: ${escapeHtml(label)}</div>
+                </div>
+            `;
+        }).join("");
+    } catch (error) {
+        console.error("Could not load student bookings.", error);
+        els.bookingStatusList.innerHTML = "<div class=\"small-note\">Unable to load your bookings right now.</div>";
+    }
+}
+
 function wireStudentActions() {
     document.querySelectorAll("[data-target]").forEach((button) => {
         button.addEventListener("click", () => showScreen(button.getAttribute("data-target")));
+    });
+
+    els.studentLoginModeBtn?.addEventListener("click", () => setStudentAuthMode("login"));
+    els.studentSignupModeBtn?.addEventListener("click", () => setStudentAuthMode("signup"));
+
+    els.studentAuthForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!window.auth) {
+            setStatus(els.studentAuthMsg, "Firebase is not configured.", "error");
+            return;
+        }
+        const email = (els.studentEmail?.value || "").trim().toLowerCase();
+        const password = els.studentPassword?.value || "";
+        const name = (els.studentName?.value || "").trim().slice(0, 100);
+        try {
+            setStatus(els.studentAuthMsg, state.studentAuthMode === "signup" ? "Creating account..." : "Signing in...");
+            if (state.studentAuthMode === "signup") {
+                if (name.length < 2) {
+                    setStatus(els.studentAuthMsg, "Please enter your full name.", "error");
+                    return;
+                }
+                const cred = await window.auth.createUserWithEmailAndPassword(email, password);
+                await cred.user.updateProfile({ displayName: name });
+                await window.db.collection("users").doc(cred.user.uid).set({
+                    email,
+                    name,
+                    role: "student",
+                    createdAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+                });
+                setStatus(els.studentAuthMsg, "Account created. You can book now.", "success");
+            } else {
+                await window.auth.signInWithEmailAndPassword(email, password);
+                setStatus(els.studentAuthMsg, "Signed in.", "success");
+            }
+        } catch (error) {
+            setStatus(els.studentAuthMsg, error.message || "Student sign-in failed.", "error");
+        }
+    });
+
+    els.studentLogoutBtn?.addEventListener("click", async () => {
+        if (!window.auth) return;
+        await window.auth.signOut();
     });
 
     els.openTeacherLoginBtn?.addEventListener("click", () => {
@@ -488,13 +636,12 @@ function wireStudentActions() {
     });
 
     els.bookingStatusBtn?.addEventListener("click", () => {
-        const email = (els.bookingStatusEmail?.value || "").trim().toLowerCase();
-        if (!email) {
-            setStatus(els.bookingStatusMsg, "Please enter your email.", "error");
+        if (!state.currentUser) {
+            setStatus(els.bookingStatusMsg, "Sign in to see your bookings.", "error");
             return;
         }
         setStatus(els.bookingStatusMsg, "");
-        loadBookingStatus(email).catch(() => {
+        loadStudentBookings().catch(() => {
             setStatus(els.bookingStatusMsg, "Unable to load booking status right now.", "error");
         });
     });
@@ -532,12 +679,13 @@ function wireStudentActions() {
 
     els.bookingForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
-        const email = (els.bookingEmail?.value || "").trim().toLowerCase();
-        const phone = normalizePhoneNumber();
-        const recaptchaReady = isLocalDevHost()
-            || !window.grecaptcha
-            || typeof window.grecaptcha.getResponse !== "function"
-            || Boolean(window.grecaptcha.getResponse());
+        if (!isStudentSignedIn()) {
+            setStatus(els.bookingMsg, "Please sign in as a student before booking.", "error");
+            els.studentAuthPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+        const email = (state.currentUser.email || "").trim().toLowerCase();
+        const name = getStudentName();
 
         await submitGuestBooking({
             db: window.db,
@@ -547,10 +695,10 @@ function wireStudentActions() {
             selectedDate: window.selectedDate,
             selectedTime: window.selectedTime,
             formValues: {
-                name: (els.bookingName?.value || "").trim().slice(0, 100),
+                name,
                 email,
-                phone,
-                notes: (els.bookingNotes?.value || "").trim().slice(0, 1000),
+                phone: "",
+                notes: "",
                 reasonLabels: [],
                 reason: "",
                 level: "",
@@ -559,7 +707,8 @@ function wireStudentActions() {
                 studentTimeZone: getLocalTimezone(),
                 studentLocale: navigator.language || "",
                 countryHint: "",
-                recaptchaReady,
+                recaptchaReady: true,
+                studentUid: state.currentUser.uid,
             },
             bookingSubmit: els.bookingSubmit,
             bookingSubmitLabel: els.bookingSubmit?.querySelector(".btn__label"),
@@ -994,14 +1143,19 @@ function showScreen(screenId) {
 }
 
 async function handleAuthState(user) {
-    state.teacherUser = user || null;
+    state.currentUser = user || null;
+    state.currentRole = "";
+    state.studentProfile = null;
+    state.teacherUser = null;
     state.teacherRole = "";
 
     if (!user) {
-        els.teacherDashboard.hidden = true;
-        els.teacherAuthBadge.textContent = "Signed out";
+        if (els.teacherDashboard) els.teacherDashboard.hidden = true;
+        if (els.teacherAuthBadge) els.teacherAuthBadge.textContent = "Signed out";
         setStatus(els.teacherAuthMsg, "Sign in to access teacher controls.");
         setStatus(els.teacherLoginMsg, "");
+        updateStudentAuthUi();
+        await loadStudentBookings();
         await loadPublicSettings();
         await renderBookingCalendar();
         await refreshGoogleCalendarStatus();
@@ -1016,18 +1170,24 @@ async function handleAuthState(user) {
         savedRole: "",
         fallbackRole: "",
     });
-    state.teacherRole = resolved.role || "";
+    state.currentRole = resolved.role || "student";
+    state.studentProfile = resolved.data || {};
 
-    if (state.teacherRole !== "teacher") {
-        els.teacherDashboard.hidden = true;
-        els.teacherAuthBadge.textContent = "Access denied";
-        setStatus(els.teacherAuthMsg, "This account is signed in, but it does not have the teacher role.", "error");
-        setStatus(els.teacherLoginMsg, "This account is not allowed to open the teacher dashboard.", "error");
-        els.teacherLoginModal?.classList.add("modal--open");
+    if (state.currentRole !== "teacher") {
+        if (els.teacherDashboard) els.teacherDashboard.hidden = true;
+        if (els.teacherAuthBadge) els.teacherAuthBadge.textContent = "Signed out";
+        setStatus(els.teacherAuthMsg, "Sign in to access teacher controls.");
+        setStatus(els.teacherLoginMsg, "");
+        updateStudentAuthUi();
+        await loadStudentBookings();
         await refreshGoogleCalendarStatus();
         showScreen("student-screen");
         return;
     }
+
+    state.teacherUser = user;
+    state.teacherRole = "teacher";
+    updateStudentAuthUi();
 
     await bootstrapTeacherAccess({
         db: window.db,
@@ -1057,6 +1217,8 @@ function buildTeacherScheduleUi() {
 async function init() {
     cacheDom();
     buildTeacherScheduleUi();
+    setStudentAuthMode("login");
+    updateStudentAuthUi();
     wireStudentActions();
     wireTeacherActions();
     showScreen("student-screen");
@@ -1069,11 +1231,6 @@ async function init() {
     await loadPublicSettings();
     await renderBookingCalendar();
     startGoogleBusyAutoRefresh();
-    const lastEmail = (localStorage.getItem("pal_arabic_last_booking_email") || "").trim();
-    if (lastEmail && els.bookingStatusEmail) {
-        els.bookingStatusEmail.value = lastEmail;
-        loadBookingStatus(lastEmail).catch(console.error);
-    }
     window.auth.onAuthStateChanged((user) => {
         handleAuthState(user).catch(console.error);
     });
