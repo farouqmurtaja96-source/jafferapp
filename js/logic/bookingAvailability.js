@@ -59,17 +59,33 @@ export function isSlotBlockedByException(slotStartMs, slotMinutes, { bookingSett
     ];
     if (!combinedBlocks.length) return false;
     const teacherTimezone = bookingSettings.timezone || getLocalTimezone() || "UTC";
-    const slotStart = getZonedParts(new Date(slotStartMs), teacherTimezone);
-    const dateKey = `${slotStart.year}-${String(slotStart.month).padStart(2, "0")}-${String(slotStart.day).padStart(2, "0")}`;
-    const slotStartMin = slotStart.hour * 60 + slotStart.minute;
-    const slotEndMin = slotStartMin + slotMinutes;
+    const slotEndMs = slotStartMs + slotMinutes * 60000;
     return combinedBlocks.some((ex) => {
-        if (!ex || ex.date !== dateKey) return false;
+        if (!ex || !ex.date) return false;
         const exStart = toMinutes(ex.start);
         const exEnd = toMinutes(ex.end);
         if (exStart === null || exEnd === null) return false;
-        if (exEnd <= exStart) return false;
-        return slotStartMin < exEnd && slotEndMin > exStart;
+        const [year, month, day] = ex.date.split("-").map(Number);
+        if (!year || !month || !day) return false;
+        const exStartMs = zonedDateTimeToUtcMs(
+            teacherTimezone,
+            year,
+            month,
+            day,
+            Math.floor(exStart / 60),
+            exStart % 60
+        );
+        const endDateKey = exEnd <= exStart ? addDaysToDateKey(ex.date, 1) : ex.date;
+        const [endYear, endMonth, endDay] = endDateKey.split("-").map(Number);
+        const exEndMs = zonedDateTimeToUtcMs(
+            teacherTimezone,
+            endYear,
+            endMonth,
+            endDay,
+            Math.floor(exEnd / 60),
+            exEnd % 60
+        );
+        return slotStartMs < exEndMs && slotEndMs > exStartMs;
     });
 }
 
@@ -111,6 +127,15 @@ export function doesSlotOverlap(slotStartMs, slotMinutes, bookedMap, excludeBook
 export async function findBookingConflict(slotStartMs, deps, { excludeBookingId = null } = {}) {
     const occupiedMinutes = deps.bookingSettings.totalSlotMinutes || deps.bookingSettings.slotMinutes || 50;
     const slotEndMs = slotStartMs + occupiedMinutes * 60000;
+    if (isSlotBlockedByException(slotStartMs, occupiedMinutes, deps)) {
+        return {
+            id: "calendar-busy",
+            start: slotStartMs,
+            end: slotEndMs,
+            status: "busy",
+            reason: "Google Calendar busy block",
+        };
+    }
     const booked = await getBookedSlotsMap(slotStartMs, slotEndMs, deps);
     const match = Array.from(booked.values()).find((booking) => {
         if (!booking || !booking.start || !booking.end) return false;
