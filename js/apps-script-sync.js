@@ -19,6 +19,11 @@ async function readTeacherAppsScriptSettings() {
     }
 }
 
+const appsScriptUrlCache = {
+    value: "",
+    expiresAt: 0,
+};
+
 function normalizeWebAppUrl(url) {
     return (url || "").trim();
 }
@@ -43,10 +48,19 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
 }
 
 async function getAppsScriptWebAppUrl() {
+    if (appsScriptUrlCache.value && Date.now() < appsScriptUrlCache.expiresAt) {
+        return appsScriptUrlCache.value;
+    }
     const teacherSettings = await readTeacherAppsScriptSettings();
-    if (teacherSettings.webAppUrl) return normalizeWebAppUrl(teacherSettings.webAppUrl);
+    if (teacherSettings.webAppUrl) {
+        appsScriptUrlCache.value = normalizeWebAppUrl(teacherSettings.webAppUrl);
+        appsScriptUrlCache.expiresAt = Date.now() + 60000;
+        return appsScriptUrlCache.value;
+    }
     const bookingData = await readBookingSettingsDoc();
-    return normalizeWebAppUrl(bookingData.appsScript?.webAppUrl || "");
+    appsScriptUrlCache.value = normalizeWebAppUrl(bookingData.appsScript?.webAppUrl || "");
+    appsScriptUrlCache.expiresAt = Date.now() + 60000;
+    return appsScriptUrlCache.value;
 }
 
 async function callAppsScript(action, payload = {}, { allowGet = false } = {}) {
@@ -119,6 +133,8 @@ async function saveAppsScriptSettings({ webAppUrl }) {
     }
 
     if (teacherWriteOk && bookingWriteOk) {
+        appsScriptUrlCache.value = normalizedUrl;
+        appsScriptUrlCache.expiresAt = Date.now() + 60000;
         return { success: true, message: normalizedUrl ? "Apps Script URL saved." : "Apps Script URL cleared." };
     }
 

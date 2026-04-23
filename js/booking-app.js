@@ -32,6 +32,7 @@ import {
     findBookingConflict,
     addDaysToDateKey,
     getZonedParts,
+    zonedDateTimeToUtcMs,
 } from "./logic/bookingAvailability.js";
 
 const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -587,8 +588,8 @@ async function renderBookingCalendar() {
     const weekEndDateKey = addDaysToDateKey(weekStartDateKey, 7);
     const [startYear, startMonth, startDay] = weekStartDateKey.split("-").map(Number);
     const [endYear, endMonth, endDay] = weekEndDateKey.split("-").map(Number);
-    const weekStart = new Date(Date.UTC(startYear, startMonth - 1, startDay, 0, 0, 0));
-    const weekEnd = new Date(Date.UTC(endYear, endMonth - 1, endDay, 0, 0, 0));
+    const weekStart = new Date(zonedDateTimeToUtcMs(timezone, startYear, startMonth, startDay, 0, 0));
+    const weekEnd = new Date(zonedDateTimeToUtcMs(timezone, endYear, endMonth, endDay, 0, 0));
     const schedule = await getSchedulableSlots(7, bookingDeps(), {
         rangeStartMs: weekStart.getTime(),
         rangeEndMs: weekEnd.getTime(),
