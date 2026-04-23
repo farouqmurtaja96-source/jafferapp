@@ -62,6 +62,8 @@ const state = {
     googleCalendarModuleLoading: null,
     publicSettingsLoaded: false,
     bookingCalendarLoaded: false,
+    publicSettingsInFlight: null,
+    bookingCalendarInFlight: null,
     busyBlocksFetchedAt: 0,
     busySyncReady: false,
     busySyncMessage: "",
@@ -549,22 +551,44 @@ function startGoogleBusyAutoRefresh() {
     }, GOOGLE_BUSY_REFRESH_MS);
 }
 
-async function loadPublicSettings() {
-    if (state.publicSettingsLoaded) return;
-    state.bookingSettings = ensureBookingSettingsShape(
-        await loadBookingSettingsFromCloud(window.db, getDefaultBookingSettings(getLocalTimezone()))
-    );
-    state.contactSettings = await loadContactSettingsFromCloud(window.db, createInitialContactSettings());
-    window.bookingSettings = state.bookingSettings;
-    state.publicSettingsLoaded = true;
+async function loadPublicSettings({ force = false } = {}) {
+    if (state.publicSettingsLoaded && !force) return;
+    if (state.publicSettingsInFlight && !force) {
+        await state.publicSettingsInFlight;
+        return;
+    }
+    state.publicSettingsInFlight = (async () => {
+        state.bookingSettings = ensureBookingSettingsShape(
+            await loadBookingSettingsFromCloud(window.db, getDefaultBookingSettings(getLocalTimezone()))
+        );
+        state.contactSettings = await loadContactSettingsFromCloud(window.db, createInitialContactSettings());
+        window.bookingSettings = state.bookingSettings;
+        state.publicSettingsLoaded = true;
+    })();
+    try {
+        await state.publicSettingsInFlight;
+    } finally {
+        state.publicSettingsInFlight = null;
+    }
 }
 
 async function ensureBookingCalendarLoaded({ force = false } = {}) {
     if (state.bookingCalendarLoaded && !force) return;
-    await loadPublicSettings();
-    await refreshRuntimeBusyBlocks({ force });
-    await renderBookingCalendar();
-    state.bookingCalendarLoaded = true;
+    if (state.bookingCalendarInFlight && !force) {
+        await state.bookingCalendarInFlight;
+        return;
+    }
+    state.bookingCalendarInFlight = (async () => {
+        await loadPublicSettings({ force });
+        await refreshRuntimeBusyBlocks({ force });
+        await renderBookingCalendar();
+        state.bookingCalendarLoaded = true;
+    })();
+    try {
+        await state.bookingCalendarInFlight;
+    } finally {
+        state.bookingCalendarInFlight = null;
+    }
 }
 
 async function renderBookingCalendar() {
@@ -1657,6 +1681,10 @@ async function handleAuthState(user) {
     state.studentProfile = null;
     state.teacherUser = null;
     state.teacherRole = "";
+    state.publicSettingsLoaded = false;
+    state.bookingCalendarLoaded = false;
+    state.publicSettingsInFlight = null;
+    state.bookingCalendarInFlight = null;
 
     if (!user) {
         if (els.teacherDashboard) els.teacherDashboard.hidden = true;
