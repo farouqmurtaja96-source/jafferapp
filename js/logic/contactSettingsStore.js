@@ -49,7 +49,6 @@ export async function loadContactSettingsFromCloud(db, currentSettings) {
                     sitePrice: typeof data.sitePrice === "string" ? data.sitePrice : currentSettings.sitePrice,
                 };
             }
-            return currentSettings;
         }
         const ref = db.collection("bookingSettings").doc("primary");
         const snap = await ref.get();
