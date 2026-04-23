@@ -30,6 +30,8 @@ import {
     getSchedulableSlots,
     getAvailableSlots,
     findBookingConflict,
+    addDaysToDateKey,
+    getZonedParts,
 } from "./logic/bookingAvailability.js";
 
 const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -320,8 +322,12 @@ function getLocalTimezone() {
     }
 }
 
+function getDisplayTimezone() {
+    return state.bookingSettings.timezone || getLocalTimezone();
+}
+
 function formatSlotTime(ts) {
-    const timezone = state.bookingSettings.timezone || getLocalTimezone();
+    const timezone = getDisplayTimezone();
     return new Date(ts).toLocaleString([], {
         dateStyle: "medium",
         timeStyle: "short",
@@ -329,11 +335,34 @@ function formatSlotTime(ts) {
     });
 }
 
-function getDateKey(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
+function getDateKey(date, timeZone = getDisplayTimezone()) {
+    const parts = getZonedParts(date, timeZone);
+    const year = parts.year;
+    const month = String(parts.month).padStart(2, "0");
+    const day = String(parts.day).padStart(2, "0");
     return `${year}-${month}-${day}`;
+}
+
+function getTimeKey(date, timeZone = getDisplayTimezone()) {
+    const parts = getZonedParts(date, timeZone);
+    return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+}
+
+function getWeekStartDateKey(offset = 0, timeZone = getDisplayTimezone()) {
+    const nowParts = getZonedParts(new Date(), timeZone);
+    const todayKey = `${nowParts.year}-${String(nowParts.month).padStart(2, "0")}-${String(nowParts.day).padStart(2, "0")}`;
+    const weekdayMap = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+    const mondayDistance = weekdayMap[nowParts.weekday] ?? 0;
+    return addDaysToDateKey(todayKey, offset * 7 - mondayDistance);
+}
+
+function formatDateKey(dateKey, options = {}) {
+    const [year, month, day] = String(dateKey || "").split("-").map(Number);
+    if (!year || !month || !day) return dateKey || "";
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).toLocaleDateString([], {
+        ...options,
+        timeZone: getDisplayTimezone(),
+    });
 }
 
 function hashEmail(email) {
@@ -417,30 +446,20 @@ function updateStudentAuthUi() {
     updateBookingSubmitState();
 }
 
-function getWeekStart(offset = 0) {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    const day = date.getDay();
-    const mondayDistance = day === 0 ? -6 : 1 - day;
-    date.setDate(date.getDate() + mondayDistance + offset * 7);
-    return date;
-}
-
 function setSelectedSlot(slotMs) {
     state.selectedSlotMs = slotMs;
     const slotDate = slotMs ? new Date(slotMs) : null;
     state.selectedDateKey = slotDate ? getDateKey(slotDate) : "";
     state.visibleDateKey = state.selectedDateKey || state.visibleDateKey;
     window.selectedDate = slotDate ? getDateKey(slotDate) : "";
-    window.selectedTime = slotDate
-        ? `${String(slotDate.getHours()).padStart(2, "0")}:${String(slotDate.getMinutes()).padStart(2, "0")}`
-        : "";
+    window.selectedTime = slotDate ? getTimeKey(slotDate) : "";
 
     if (slotDate && els.bookingInfo && els.selectedTimeDisplay) {
         els.bookingInfo.hidden = false;
         els.selectedTimeDisplay.textContent = slotDate.toLocaleString([], {
             dateStyle: "full",
             timeStyle: "short",
+            timeZone: getDisplayTimezone(),
         });
         updateBookingSubmitState();
     } else if (els.bookingInfo) {
@@ -548,7 +567,7 @@ async function ensureBookingCalendarLoaded({ force = false } = {}) {
 
 async function renderBookingCalendar() {
     if (!window.db) return;
-    const timezone = getLocalTimezone();
+    const timezone = getDisplayTimezone();
     if (els.bookingTimezoneLabel) {
         els.bookingTimezoneLabel.textContent = `Showing times in ${timezone}`;
     }
@@ -564,9 +583,12 @@ async function renderBookingCalendar() {
         return;
     }
 
-    const weekStart = getWeekStart(state.bookingWeekOffset);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 7);
+    const weekStartDateKey = getWeekStartDateKey(state.bookingWeekOffset, timezone);
+    const weekEndDateKey = addDaysToDateKey(weekStartDateKey, 7);
+    const [startYear, startMonth, startDay] = weekStartDateKey.split("-").map(Number);
+    const [endYear, endMonth, endDay] = weekEndDateKey.split("-").map(Number);
+    const weekStart = new Date(Date.UTC(startYear, startMonth - 1, startDay, 0, 0, 0));
+    const weekEnd = new Date(Date.UTC(endYear, endMonth - 1, endDay, 0, 0, 0));
     const schedule = await getSchedulableSlots(7, bookingDeps(), {
         rangeStartMs: weekStart.getTime(),
         rangeEndMs: weekEnd.getTime(),
@@ -574,15 +596,10 @@ async function renderBookingCalendar() {
     const days = [];
 
     for (let i = 0; i < 7; i += 1) {
-        const date = new Date(weekStart);
-        date.setDate(weekStart.getDate() + i);
-        const dateKey = getDateKey(date);
-        const label = date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+        const dateKey = addDaysToDateKey(weekStartDateKey, i);
         const slots = schedule.filter((slot) => slot.available && slot.dateKey === dateKey);
         days.push({
-            date,
             dateKey,
-            label,
             slots,
             firstSlotMs: slots[0]?.startMs || null,
         });
@@ -594,9 +611,8 @@ async function renderBookingCalendar() {
     state.visibleDateKey = fallbackVisibleDate;
 
     if (els.bookingWeekLabel) {
-        const weekLabelEnd = new Date(weekStart);
-        weekLabelEnd.setDate(weekStart.getDate() + 6);
-        els.bookingWeekLabel.textContent = `${weekStart.toLocaleDateString([], { month: "short", day: "numeric" })} - ${weekLabelEnd.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+        const weekLabelEndKey = addDaysToDateKey(weekStartDateKey, 6);
+        els.bookingWeekLabel.textContent = `${formatDateKey(weekStartDateKey, { month: "short", day: "numeric" })} - ${formatDateKey(weekLabelEndKey, { month: "short", day: "numeric" })}`;
     }
 
     if (!els.bookingWeeklyGrid) return;
@@ -610,8 +626,8 @@ async function renderBookingCalendar() {
         const header = document.createElement("div");
         header.className = "booking-day-header";
         header.innerHTML = `
-            <div class="booking-day-label">${escapeHtml(day.date.toLocaleDateString([], { weekday: "long" }))}</div>
-            <div class="booking-day-date">${escapeHtml(day.date.toLocaleDateString([], { month: "short", day: "numeric" }))}</div>
+            <div class="booking-day-label">${escapeHtml(formatDateKey(day.dateKey, { weekday: "long" }))}</div>
+            <div class="booking-day-date">${escapeHtml(formatDateKey(day.dateKey, { month: "short", day: "numeric" }))}</div>
         `;
         column.appendChild(header);
 
@@ -633,6 +649,7 @@ async function renderBookingCalendar() {
                 btn.textContent = new Date(slot.startMs).toLocaleTimeString([], {
                     hour: "numeric",
                     minute: "2-digit",
+                    timeZone: timezone,
                 });
                 btn.addEventListener("click", () => {
                     state.visibleDateKey = day.dateKey;

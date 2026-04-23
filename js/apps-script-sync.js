@@ -23,6 +23,25 @@ function normalizeWebAppUrl(url) {
     return (url || "").trim();
 }
 
+function toQueryString(payload) {
+    return new URLSearchParams(
+        Object.entries(payload).map(([key, value]) => [key, String(value)])
+    ).toString();
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(url, {
+            ...options,
+            signal: controller.signal,
+        });
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
 async function getAppsScriptWebAppUrl() {
     const teacherSettings = await readTeacherAppsScriptSettings();
     if (teacherSettings.webAppUrl) return normalizeWebAppUrl(teacherSettings.webAppUrl);
@@ -38,19 +57,24 @@ async function callAppsScript(action, payload = {}, { allowGet = false } = {}) {
 
     try {
         const body = { action, ...payload };
-        const res = await fetch(webAppUrl, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(body),
-        });
+        const requestUrl = allowGet
+            ? `${webAppUrl}?${toQueryString(body)}`
+            : webAppUrl;
+        const res = await fetchWithTimeout(requestUrl, allowGet
+            ? { method: "GET" }
+            : {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(body),
+            });
         const text = await res.text();
         const parsed = text ? JSON.parse(text) : {};
         return parsed;
     } catch (err) {
         if (allowGet) {
             try {
-                const qs = new URLSearchParams({ action, ...Object.fromEntries(Object.entries(payload).map(([k, v]) => [k, String(v)])) });
-                const res = await fetch(`${webAppUrl}?${qs.toString()}`);
+                const qs = toQueryString({ action, ...payload });
+                const res = await fetchWithTimeout(`${webAppUrl}?${qs}`, { method: "GET" }, 12000);
                 const text = await res.text();
                 return text ? JSON.parse(text) : {};
             } catch (getErr) {
