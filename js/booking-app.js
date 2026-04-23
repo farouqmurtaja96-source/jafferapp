@@ -472,6 +472,10 @@ function bookingDeps() {
 }
 
 function getScheduleCacheKey(daysToShow) {
+    const busyFingerprint = (Array.isArray(state.runtimeBusyBlocks) ? state.runtimeBusyBlocks : [])
+        .slice(0, 80)
+        .map((block) => `${block.startMs || block.date || ""}:${block.endMs || `${block.start || ""}-${block.end || ""}`}`)
+        .join("|");
     return JSON.stringify({
         daysToShow,
         weekOffset: state.bookingWeekOffset,
@@ -479,8 +483,8 @@ function getScheduleCacheKey(daysToShow) {
         slotMinutes: state.bookingSettings.slotMinutes || 50,
         totalSlotMinutes: state.bookingSettings.totalSlotMinutes || 50,
         breakMinutes: state.bookingSettings.breakMinutes || 0,
-        exceptions: Array.isArray(state.bookingSettings.exceptions) ? state.bookingSettings.exceptions.length : 0,
-        runtimeBusyBlocks: Array.isArray(state.runtimeBusyBlocks) ? state.runtimeBusyBlocks.length : 0,
+        exceptions: JSON.stringify(state.bookingSettings.exceptions || []),
+        runtimeBusyBlocks: busyFingerprint,
     });
 }
 

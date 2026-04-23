@@ -155,6 +155,8 @@ function buildBusyBlocks_(events, timeZone) {
     const start = new Date(event.start);
     const end = new Date(event.end);
     return {
+      startMs: start.getTime(),
+      endMs: end.getTime(),
       date: Utilities.formatDate(start, timeZone, 'yyyy-MM-dd'),
       start: Utilities.formatDate(start, timeZone, 'HH:mm'),
       end: Utilities.formatDate(end, timeZone, 'HH:mm'),
@@ -162,6 +164,15 @@ function buildBusyBlocks_(events, timeZone) {
       sourceEventId: event.id || '',
     };
   });
+}
+
+function getBusyCacheKey_(calendarIds, days, timeZone) {
+  return [
+    'busy',
+    String(days || 0),
+    String(timeZone || ''),
+    calendarIds.join('|')
+  ].join('::');
 }
 
 function doGet(e) {
@@ -192,14 +203,22 @@ function handleRequest_(e) {
     if (action === 'getBusy') {
       const days = Math.max(1, Math.min(90, Number(req.days || 30)));
       const timeZone = req.timeZone || config.defaultTimeZone;
+      const calendarIds = getBusyCalendarIds_(config);
+      const cache = CacheService.getScriptCache();
+      const cacheKey = getBusyCacheKey_(calendarIds, days, timeZone);
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return ContentService
+          .createTextOutput(cached)
+          .setMimeType(ContentService.MimeType.JSON);
+      }
       const start = new Date();
       const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
-      const calendarIds = getBusyCalendarIds_(config);
       let events = [];
       calendarIds.forEach(function (calendarId) {
         events = events.concat(listEvents_(calendarId, start, end));
       });
-      return jsonOut({
+      const payload = {
         success: true,
         message: 'Busy times loaded.',
         busyBlocks: buildBusyBlocks_(events, timeZone),
@@ -209,7 +228,9 @@ function handleRequest_(e) {
           calendarsChecked: calendarIds.length,
           additionalCalendars: (config.additionalCalendarIds || []).length,
         }
-      });
+      };
+      cache.put(cacheKey, JSON.stringify(payload), 20);
+      return jsonOut(payload);
     }
 
     if (action === 'createBooking') {

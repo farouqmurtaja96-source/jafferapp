@@ -62,6 +62,9 @@ export function isSlotBlockedByException(slotStartMs, slotMinutes, { bookingSett
     const slotEndMs = slotStartMs + slotMinutes * 60000;
     return combinedBlocks.some((ex) => {
         if (!ex || !ex.date) return false;
+        if (Number.isFinite(ex.startMs) && Number.isFinite(ex.endMs)) {
+            return slotStartMs < Number(ex.endMs) && slotEndMs > Number(ex.startMs);
+        }
         const exStart = toMinutes(ex.start);
         const exEnd = toMinutes(ex.end);
         if (exStart === null || exEnd === null) return false;
@@ -85,7 +88,7 @@ export function isSlotBlockedByException(slotStartMs, slotMinutes, { bookingSett
             Math.floor(exEnd / 60),
             exEnd % 60
         );
-    return slotStartMs < exEndMs && slotEndMs > exStartMs;
+        return slotStartMs < exEndMs && slotEndMs > exStartMs;
     });
 }
 
