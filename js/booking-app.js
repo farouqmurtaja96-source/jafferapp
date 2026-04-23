@@ -511,8 +511,9 @@ async function refreshRuntimeBusyBlocksNow({ force = false } = {}) {
         state.busySyncMessage = "Calendar sync is not available right now.";
         return;
     }
+    const daysToFetch = Math.max(8, (state.bookingWeekOffset + 1) * 7 + 1);
     const result = await window.fetchBusyBlocksFromAppsScript({
-        days: 14,
+        days: Math.min(daysToFetch, 21),
         timeZone: state.bookingSettings.timezone || getLocalTimezone(),
     });
     state.busySyncReady = !!(result?.success && Array.isArray(result.busyBlocks));
@@ -1122,6 +1123,7 @@ function wireStudentActions() {
             bookingSettings: state.bookingSettings,
             contactSettings: state.contactSettings,
             getLocalTimezone,
+            selectedSlotMs: state.selectedSlotMs,
             selectedDate: window.selectedDate,
             selectedTime: window.selectedTime,
             formValues: {

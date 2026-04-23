@@ -50,6 +50,7 @@ export async function submitGuestBooking({
     bookingSettings,
     contactSettings,
     getLocalTimezone,
+    selectedSlotMs,
     selectedDate,
     selectedTime,
     formValues,
@@ -121,10 +122,8 @@ export async function submitGuestBooking({
         return;
     }
 
-    const [hours, minutes] = selectedTime.split(':').map(Number);
-    const slotDate = new Date(selectedDate);
-    slotDate.setHours(hours, minutes, 0, 0);
-    const selectedSlot = slotDate.getTime();
+    const selectedSlot = Number(selectedSlotMs || 0);
+    const slotDate = selectedSlot ? new Date(selectedSlot) : null;
     if (!Number.isFinite(selectedSlot) || selectedSlot <= Date.now() + (30 * 60 * 1000)) {
         if (bookingMsg) bookingMsg.textContent = "Please choose a future time at least 30 minutes from now.";
         return;
@@ -138,7 +137,11 @@ export async function submitGuestBooking({
         if (bookingSubmitLabel) bookingSubmitLabel.textContent = "Booking...";
         if (bookingMsg) bookingMsg.textContent = "Booking your lesson...";
 
-        const slot = slotDate.toLocaleString();
+        const slot = slotDate.toLocaleString([], {
+            dateStyle: "medium",
+            timeStyle: "short",
+            timeZone: bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
+        });
         const refreshed = await refreshCalendarAvailability?.();
         if (refreshed === false) {
             if (bookingMsg) bookingMsg.textContent = "Calendar sync is unavailable. Please try again in a moment.";
