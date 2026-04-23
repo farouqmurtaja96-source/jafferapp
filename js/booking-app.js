@@ -36,6 +36,8 @@ const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_TIMEZONE = "Africa/Cairo";
 const GOOGLE_BUSY_REFRESH_MS = 60000;
 const STUDENT_CHANGE_CUTOFF_MS = 12 * 60 * 60 * 1000;
+const BUSY_BLOCKS_CACHE_MS = 30000;
+const BOOKING_GRID_CACHE_MS = 15000;
 
 const state = {
     bookingSettings: ensureBookingSettingsShape(createInitialBookingSettings()),
@@ -58,6 +60,9 @@ const state = {
     googleCalendarModuleLoading: null,
     publicSettingsLoaded: false,
     bookingCalendarLoaded: false,
+    scheduleCache: new Map(),
+    schedulePreloadTimer: null,
+    busyBlocksFetchedAt: 0,
     busySyncReady: false,
     busySyncMessage: "",
 };
@@ -447,6 +452,15 @@ function setSelectedSlot(slotMs) {
     }
 }
 
+function syncBookingGridSelection() {
+    document.querySelectorAll(".slot-btn").forEach((button) => {
+        button.classList.toggle("is-selected", Number(button.dataset.slotStart || 0) === Number(state.selectedSlotMs || 0));
+    });
+    document.querySelectorAll(".booking-day-column").forEach((column) => {
+        column.classList.toggle("is-focused", column.dataset.dateKey === state.visibleDateKey);
+    });
+}
+
 function bookingDeps() {
     return {
         db: window.db,
@@ -457,17 +471,75 @@ function bookingDeps() {
     };
 }
 
-async function refreshRuntimeBusyBlocks() {
+function getScheduleCacheKey(daysToShow) {
+    return JSON.stringify({
+        daysToShow,
+        weekOffset: state.bookingWeekOffset,
+        timezone: state.bookingSettings.timezone || "",
+        slotMinutes: state.bookingSettings.slotMinutes || 50,
+        totalSlotMinutes: state.bookingSettings.totalSlotMinutes || 50,
+        breakMinutes: state.bookingSettings.breakMinutes || 0,
+        exceptions: Array.isArray(state.bookingSettings.exceptions) ? state.bookingSettings.exceptions.length : 0,
+        runtimeBusyBlocks: Array.isArray(state.runtimeBusyBlocks) ? state.runtimeBusyBlocks.length : 0,
+    });
+}
+
+function readScheduleCache(cacheKey) {
+    const entry = state.scheduleCache.get(cacheKey);
+    if (!entry) return null;
+    if (Date.now() - entry.at >= BOOKING_GRID_CACHE_MS) {
+        state.scheduleCache.delete(cacheKey);
+        return null;
+    }
+    return entry.schedule;
+}
+
+function writeScheduleCache(cacheKey, schedule) {
+    state.scheduleCache.set(cacheKey, {
+        at: Date.now(),
+        schedule,
+    });
+}
+
+function clearScheduleCache() {
+    state.scheduleCache.clear();
+}
+
+function primeExtendedBookingSchedule() {
+    if (!state.busySyncReady || !window.db) return;
+    if (state.schedulePreloadTimer) {
+        window.clearTimeout(state.schedulePreloadTimer);
+    }
+    state.schedulePreloadTimer = window.setTimeout(async () => {
+        try {
+            const preloadDays = Math.max(21, (state.bookingWeekOffset + 3) * 7);
+            const cacheKey = getScheduleCacheKey(preloadDays);
+            if (readScheduleCache(cacheKey)) return;
+            const schedule = await getSchedulableSlots(preloadDays, bookingDeps());
+            writeScheduleCache(cacheKey, schedule);
+        } catch (error) {
+            console.error("Could not preload extended booking schedule.", error);
+        }
+    }, 120);
+}
+
+async function refreshRuntimeBusyBlocks({ force = false } = {}) {
+    if (!force && state.busySyncReady && Date.now() - state.busyBlocksFetchedAt < BUSY_BLOCKS_CACHE_MS) {
+        return state.runtimeBusyBlocks;
+    }
     if (state.busyRefreshInFlight) {
         return state.busyRefreshInFlight;
     }
-    state.busyRefreshInFlight = refreshRuntimeBusyBlocksNow().finally(() => {
+    state.busyRefreshInFlight = refreshRuntimeBusyBlocksNow({ force }).finally(() => {
         state.busyRefreshInFlight = null;
     });
     return state.busyRefreshInFlight;
 }
 
-async function refreshRuntimeBusyBlocksNow() {
+async function refreshRuntimeBusyBlocksNow({ force = false } = {}) {
+    if (!force && state.busySyncReady && Date.now() - state.busyBlocksFetchedAt < BUSY_BLOCKS_CACHE_MS) {
+        return state.runtimeBusyBlocks;
+    }
     if (typeof window.fetchBusyBlocksFromAppsScript !== "function") {
         state.runtimeBusyBlocks = [];
         state.busySyncReady = false;
@@ -475,12 +547,14 @@ async function refreshRuntimeBusyBlocksNow() {
         return;
     }
     const result = await window.fetchBusyBlocksFromAppsScript({
-        days: 45,
+        days: 21,
         timeZone: state.bookingSettings.timezone || getLocalTimezone(),
     });
     state.busySyncReady = !!(result?.success && Array.isArray(result.busyBlocks));
     state.busySyncMessage = state.busySyncReady ? "" : (result?.message || "Could not reach Google Calendar sync.");
     state.runtimeBusyBlocks = state.busySyncReady ? result.busyBlocks : [];
+    state.busyBlocksFetchedAt = Date.now();
+    clearScheduleCache();
 }
 
 async function refreshGoogleBusyAndCalendar({ silent = true } = {}) {
@@ -521,7 +595,7 @@ async function loadPublicSettings() {
 async function ensureBookingCalendarLoaded({ force = false } = {}) {
     if (state.bookingCalendarLoaded && !force) return;
     await loadPublicSettings();
-    await refreshRuntimeBusyBlocks();
+    await refreshRuntimeBusyBlocks({ force });
     await renderBookingCalendar();
     state.bookingCalendarLoaded = true;
 }
@@ -544,7 +618,13 @@ async function renderBookingCalendar() {
         return;
     }
 
-    const schedule = await getSchedulableSlots(42, bookingDeps());
+    const daysToShow = Math.max(7, (state.bookingWeekOffset + 1) * 7);
+    const scheduleCacheKey = getScheduleCacheKey(daysToShow);
+    const cachedSchedule = readScheduleCache(scheduleCacheKey);
+    const schedule = cachedSchedule || await getSchedulableSlots(daysToShow, bookingDeps());
+    if (!cachedSchedule) {
+        writeScheduleCache(scheduleCacheKey, schedule);
+    }
     const weekStart = getWeekStart(state.bookingWeekOffset);
     const days = [];
 
@@ -604,16 +684,15 @@ async function renderBookingCalendar() {
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = `slot-btn${state.selectedSlotMs === slot.startMs ? " is-selected" : ""}`;
+                btn.dataset.slotStart = String(slot.startMs);
                 btn.textContent = new Date(slot.startMs).toLocaleTimeString([], {
                     hour: "numeric",
                     minute: "2-digit",
                 });
                 btn.addEventListener("click", () => {
-                    withButtonLoading(btn, "Selecting...", async () => {
-                        state.visibleDateKey = day.dateKey;
-                        setSelectedSlot(slot.startMs);
-                        await renderBookingCalendar();
-                    }).catch(console.error);
+                    state.visibleDateKey = day.dateKey;
+                    setSelectedSlot(slot.startMs);
+                    syncBookingGridSelection();
                 });
                 body.appendChild(btn);
             });
@@ -631,6 +710,8 @@ async function renderBookingCalendar() {
         const stillAvailable = schedule.some((slot) => slot.available && slot.startMs === state.selectedSlotMs);
         if (!stillAvailable) setSelectedSlot(null);
     }
+
+    primeExtendedBookingSchedule();
 }
 
 async function loadBookingStatus(email) {
@@ -949,14 +1030,14 @@ function wireStudentActions() {
         await withButtonLoading(els.studentLogoutBtn, "Signing out...", () => window.auth.signOut());
     });
 
-    els.bookingWeekPrev?.addEventListener("click", (event) => {
+    els.bookingWeekPrev?.addEventListener("click", () => {
         state.bookingWeekOffset = Math.max(0, state.bookingWeekOffset - 1);
-        withButtonLoading(event.currentTarget, "Loading...", () => refreshGoogleBusyAndCalendar()).catch(console.error);
+        renderBookingCalendar().catch(console.error);
     });
 
-    els.bookingWeekNext?.addEventListener("click", (event) => {
+    els.bookingWeekNext?.addEventListener("click", () => {
         state.bookingWeekOffset += 1;
-        withButtonLoading(event.currentTarget, "Loading...", () => refreshGoogleBusyAndCalendar()).catch(console.error);
+        renderBookingCalendar().catch(console.error);
     });
 
     els.bookingStatusBtn?.addEventListener("click", (event) => {

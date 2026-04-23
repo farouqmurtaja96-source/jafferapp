@@ -85,11 +85,19 @@ export function isSlotBlockedByException(slotStartMs, slotMinutes, { bookingSett
             Math.floor(exEnd / 60),
             exEnd % 60
         );
-        return slotStartMs < exEndMs && slotEndMs > exStartMs;
+    return slotStartMs < exEndMs && slotEndMs > exStartMs;
     });
 }
 
+const bookedSlotsCache = new Map();
+const BOOKED_SLOTS_CACHE_MS = 10000;
+
 export async function getBookedSlotsMap(startMs, endMs, { db, bookingSettings }) {
+    const cacheKey = `${startMs}:${endMs}:${bookingSettings.totalSlotMinutes || bookingSettings.slotMinutes || 50}`;
+    const cached = bookedSlotsCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < BOOKED_SLOTS_CACHE_MS) {
+        return cached.value;
+    }
     const booked = new Map();
     const occupiedMinutes = bookingSettings.totalSlotMinutes || bookingSettings.slotMinutes || 50;
     try {
@@ -112,6 +120,10 @@ export async function getBookedSlotsMap(startMs, endMs, { db, bookingSettings })
             });
         });
     } catch {}
+    bookedSlotsCache.set(cacheKey, {
+        at: Date.now(),
+        value: booked,
+    });
     return booked;
 }
 
