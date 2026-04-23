@@ -98,7 +98,7 @@ export function isSlotBlockedByException(slotStartMs, slotMinutes, { bookingSett
 }
 
 const bookedSlotsCache = new Map();
-const BOOKED_SLOTS_CACHE_MS = 10000;
+const BOOKED_SLOTS_CACHE_MS = 60000;
 
 export async function getBookedSlotsMap(startMs, endMs, { db, bookingSettings }) {
     const cacheKey = `${startMs}:${endMs}:${bookingSettings.totalSlotMinutes || bookingSettings.slotMinutes || 50}`;

@@ -2,12 +2,10 @@ import {
     createInitialBookingSettings,
     ensureBookingSettingsShape,
     getDefaultBookingSettings,
-    loadBookingSettingsFromCloud,
     saveBookingSettingsToCloud,
 } from "./logic/bookingSettingsStore.js";
 import {
     createInitialContactSettings,
-    loadContactSettingsFromCloud,
     saveContactSettingsToCloud,
     buildWhatsAppUrl,
 } from "./logic/contactSettingsStore.js";
@@ -39,7 +37,7 @@ const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_TIMEZONE = "Africa/Cairo";
 const GOOGLE_BUSY_REFRESH_MS = 60000;
 const STUDENT_CHANGE_CUTOFF_MS = 12 * 60 * 60 * 1000;
-const BUSY_BLOCKS_CACHE_MS = 10000;
+const BUSY_BLOCKS_CACHE_MS = 60000;
 
 const state = {
     bookingSettings: ensureBookingSettingsShape(createInitialBookingSettings()),
@@ -65,6 +63,7 @@ const state = {
     publicSettingsInFlight: null,
     bookingCalendarInFlight: null,
     busyBlocksFetchedAt: 0,
+    busyBlocksRangeDays: 0,
     busySyncReady: false,
     busySyncMessage: "",
 };
@@ -325,8 +324,12 @@ function getLocalTimezone() {
     }
 }
 
+function getTeacherTimezone() {
+    return state.bookingSettings.timezone || DEFAULT_TIMEZONE;
+}
+
 function getDisplayTimezone() {
-    return state.bookingSettings.timezone || getLocalTimezone();
+    return getLocalTimezone();
 }
 
 function formatSlotTime(ts) {
@@ -491,7 +494,14 @@ function bookingDeps() {
 }
 
 async function refreshRuntimeBusyBlocks({ force = false } = {}) {
-    if (!force && state.busySyncReady && Date.now() - state.busyBlocksFetchedAt < BUSY_BLOCKS_CACHE_MS) {
+    const daysToFetch = Math.max(8, (state.bookingWeekOffset + 1) * 7 + 1);
+    const requestedDays = Math.min(daysToFetch, 21);
+    if (
+        !force
+        && state.busySyncReady
+        && Date.now() - state.busyBlocksFetchedAt < BUSY_BLOCKS_CACHE_MS
+        && state.busyBlocksRangeDays >= requestedDays
+    ) {
         return state.runtimeBusyBlocks;
     }
     if (state.busyRefreshInFlight) {
@@ -504,25 +514,33 @@ async function refreshRuntimeBusyBlocks({ force = false } = {}) {
 }
 
 async function refreshRuntimeBusyBlocksNow({ force = false } = {}) {
-    if (!force && state.busySyncReady && Date.now() - state.busyBlocksFetchedAt < BUSY_BLOCKS_CACHE_MS) {
+    const daysToFetch = Math.max(8, (state.bookingWeekOffset + 1) * 7 + 1);
+    const requestedDays = Math.min(daysToFetch, 21);
+    if (
+        !force
+        && state.busySyncReady
+        && Date.now() - state.busyBlocksFetchedAt < BUSY_BLOCKS_CACHE_MS
+        && state.busyBlocksRangeDays >= requestedDays
+    ) {
         return state.runtimeBusyBlocks;
     }
     if (typeof window.fetchBusyBlocksFromAppsScript !== "function") {
         state.runtimeBusyBlocks = [];
+        state.busyBlocksRangeDays = 0;
         state.busySyncReady = false;
         state.busySyncMessage = "Calendar sync is not available right now.";
         return;
     }
-    const daysToFetch = Math.max(8, (state.bookingWeekOffset + 1) * 7 + 1);
     const result = await window.fetchBusyBlocksFromAppsScript({
-        days: Math.min(daysToFetch, 21),
-        timeZone: state.bookingSettings.timezone || getLocalTimezone(),
+        days: requestedDays,
+        timeZone: getTeacherTimezone(),
     });
     state.busySyncReady = !!(result?.success && Array.isArray(result.busyBlocks));
     state.busySyncMessage = state.busySyncReady ? "" : (result?.message || "Could not reach Google Calendar sync.");
     state.runtimeBusyBlocks = state.busySyncReady
         ? [...result.busyBlocks].sort((a, b) => Number(a.startMs || 0) - Number(b.startMs || 0))
         : [];
+    state.busyBlocksRangeDays = state.busySyncReady ? requestedDays : 0;
     state.busyBlocksFetchedAt = Date.now();
 }
 
@@ -558,10 +576,18 @@ async function loadPublicSettings({ force = false } = {}) {
         return;
     }
     state.publicSettingsInFlight = (async () => {
-        state.bookingSettings = ensureBookingSettingsShape(
-            await loadBookingSettingsFromCloud(window.db, getDefaultBookingSettings(getLocalTimezone()))
-        );
-        state.contactSettings = await loadContactSettingsFromCloud(window.db, createInitialContactSettings());
+        const publicSnap = await window.db.collection("bookingSettings").doc("primary").get();
+        const publicData = publicSnap.exists ? (publicSnap.data() || {}) : {};
+        state.bookingSettings = ensureBookingSettingsShape({
+            ...getDefaultBookingSettings(DEFAULT_TIMEZONE),
+            ...publicData,
+        });
+        state.contactSettings = {
+            ...createInitialContactSettings(),
+            whatsapp: typeof publicData.whatsapp === "string" ? publicData.whatsapp : "",
+            email: typeof publicData.contactEmail === "string" ? publicData.contactEmail : "",
+            sitePrice: typeof publicData.sitePrice === "string" ? publicData.sitePrice : "",
+        };
         window.bookingSettings = state.bookingSettings;
         state.publicSettingsLoaded = true;
     })();
@@ -579,8 +605,10 @@ async function ensureBookingCalendarLoaded({ force = false } = {}) {
         return;
     }
     state.bookingCalendarInFlight = (async () => {
-        await loadPublicSettings({ force });
-        await refreshRuntimeBusyBlocks({ force });
+        await Promise.all([
+            loadPublicSettings({ force }),
+            refreshRuntimeBusyBlocks({ force }),
+        ]);
         await renderBookingCalendar();
         state.bookingCalendarLoaded = true;
     })();
@@ -619,11 +647,20 @@ async function renderBookingCalendar() {
         rangeStartMs: weekStart.getTime(),
         rangeEndMs: weekEnd.getTime(),
     });
+    const slotsByDate = new Map();
+    schedule.forEach((slot) => {
+        if (!slot.available) return;
+        const slotDateKey = getDateKey(new Date(slot.startMs), timezone);
+        if (!slotsByDate.has(slotDateKey)) {
+            slotsByDate.set(slotDateKey, []);
+        }
+        slotsByDate.get(slotDateKey).push(slot);
+    });
     const days = [];
 
     for (let i = 0; i < 7; i += 1) {
         const dateKey = addDaysToDateKey(weekStartDateKey, i);
-        const slots = schedule.filter((slot) => slot.available && slot.dateKey === dateKey);
+        const slots = slotsByDate.get(dateKey) || [];
         days.push({
             dateKey,
             slots,
@@ -727,11 +764,11 @@ async function loadStudentBookings() {
         const snap = await window.db
             .collection("bookings")
             .where("studentUid", "==", state.currentUser.uid)
+            .orderBy("slot", "desc")
             .limit(10)
             .get();
         const rows = [];
         snap.forEach((doc) => rows.push({ id: doc.id, ...(doc.data() || {}) }));
-        rows.sort((a, b) => (b.slot || 0) - (a.slot || 0));
         if (!rows.length) {
             els.bookingStatusList.innerHTML = "<div class=\"small-note\">No bookings yet.</div>";
             return;
@@ -859,8 +896,8 @@ async function rescheduleStudentBooking(bookingId, newSlot) {
         const createResult = await window.createBookingViaAppsScript({
             bookingId,
             slot: newSlot,
-            durationMinutes: 50,
-            timeZone: state.bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
+            durationMinutes: state.bookingSettings.slotMinutes || 50,
+            timeZone: getTeacherTimezone(),
             teacherEmail: (state.contactSettings?.email || "").trim(),
             name: booking.name || getStudentName(),
             email: booking.email || state.currentUser?.email || "",
@@ -919,8 +956,8 @@ async function createCalendarEventForBooking(bookingId, booking, slot) {
     return window.createBookingViaAppsScript({
         bookingId,
         slot,
-        durationMinutes: 50,
-        timeZone: state.bookingSettings.timezone || getLocalTimezone() || "Africa/Cairo",
+        durationMinutes: state.bookingSettings.slotMinutes || 50,
+        timeZone: getTeacherTimezone(),
         teacherEmail: (state.contactSettings?.email || "").trim(),
         name: booking.name || "Student",
         email: booking.email || "",
@@ -1018,12 +1055,16 @@ function wireStudentActions() {
 
     els.bookingWeekPrev?.addEventListener("click", () => {
         state.bookingWeekOffset = Math.max(0, state.bookingWeekOffset - 1);
-        renderBookingCalendar().catch(console.error);
+        refreshRuntimeBusyBlocks()
+            .then(() => renderBookingCalendar())
+            .catch(console.error);
     });
 
     els.bookingWeekNext?.addEventListener("click", () => {
         state.bookingWeekOffset += 1;
-        renderBookingCalendar().catch(console.error);
+        refreshRuntimeBusyBlocks()
+            .then(() => renderBookingCalendar())
+            .catch(console.error);
     });
 
     els.bookingStatusBtn?.addEventListener("click", (event) => {
@@ -1208,7 +1249,7 @@ function renderTeacherDays() {
 }
 
 function syncTeacherFormFields() {
-    if (els.teacherTimezone) els.teacherTimezone.value = state.bookingSettings.timezone || getLocalTimezone();
+    if (els.teacherTimezone) els.teacherTimezone.value = state.bookingSettings.timezone || getTeacherTimezone();
     if (els.teacherSlotMinutes) els.teacherSlotMinutes.value = String(state.bookingSettings.slotMinutes || 50);
     if (els.teacherBreakMinutes) els.teacherBreakMinutes.value = String(state.bookingSettings.breakMinutes || 10);
     if (els.teacherWhatsapp) els.teacherWhatsapp.value = state.contactSettings.whatsapp || "";
@@ -1287,16 +1328,16 @@ async function saveTeacherContactSettings() {
 
 async function refreshTeacherDashboard() {
     if (!state.teacherUser || state.teacherRole !== "teacher") return;
-    state.bookingSettings = ensureBookingSettingsShape(
-        await loadBookingSettingsFromCloud(
-            window.db,
-            ensureBookingSettingsShape(state.bookingSettings || getDefaultBookingSettings(getLocalTimezone()))
-        )
-    );
-    state.contactSettings = await loadContactSettingsFromCloud(
-        window.db,
-        state.contactSettings || createInitialContactSettings()
-    );
+    const teacherSnap = await window.db.collection("teachers").doc(state.teacherUser.uid).get();
+    const teacherData = teacherSnap.exists ? (teacherSnap.data() || {}) : {};
+    state.bookingSettings = ensureBookingSettingsShape({
+        ...getDefaultBookingSettings(getTeacherTimezone()),
+        ...(teacherData.bookingSettings || {}),
+    });
+    state.contactSettings = {
+        ...createInitialContactSettings(),
+        ...(teacherData.contactSettings || {}),
+    };
     window.bookingSettings = state.bookingSettings;
     await refreshRuntimeBusyBlocks();
     syncTeacherFormFields();
@@ -1685,6 +1726,7 @@ async function handleAuthState(user) {
     state.bookingCalendarLoaded = false;
     state.publicSettingsInFlight = null;
     state.bookingCalendarInFlight = null;
+    state.busyBlocksRangeDays = 0;
 
     if (!user) {
         if (els.teacherDashboard) els.teacherDashboard.hidden = true;
@@ -1739,8 +1781,10 @@ async function handleAuthState(user) {
 
     const teacherDoc = await window.db.collection("teachers").doc(user.uid).get();
     const teacherData = teacherDoc.exists ? (teacherDoc.data() || {}) : {};
-    els.teacherAppsScriptUrl.value = teacherData.appsScript?.webAppUrl || "";
-    els.teacherPreplyCalendarId.value = teacherData.preplyCalendarId || teacherData.googleCalendar?.preplyCalendarId || "";
+    if (els.teacherAppsScriptUrl) els.teacherAppsScriptUrl.value = teacherData.appsScript?.webAppUrl || "";
+    if (els.teacherPreplyCalendarId) {
+        els.teacherPreplyCalendarId.value = teacherData.preplyCalendarId || teacherData.googleCalendar?.preplyCalendarId || "";
+    }
     await refreshTeacherDashboard();
     showScreen("teacher-screen");
 }

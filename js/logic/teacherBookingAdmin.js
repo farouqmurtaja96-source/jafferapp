@@ -12,6 +12,7 @@ export async function renderTeacherBookings({
         const now = Date.now() - 3600000;
         const snap = await db
             .collection("bookings")
+            .where("slot", ">=", now)
             .orderBy("slot")
             .limit(200)
             .get();
@@ -19,7 +20,6 @@ export async function renderTeacherBookings({
         snap.forEach((doc) => {
             const data = doc.data();
             if (!data || !data.slot) return;
-            if (data.slot < now) return;
             items.push({ id: doc.id, ...data });
         });
         if (!items.length) {
@@ -60,8 +60,8 @@ export async function renderTeacherBookings({
                             <div class="${statusClass}">${escapeHtml(statusLabel)}</div>
                         </div>
                         <div class="booking-item__actions">
-                            <button class="btn btn--ghost btn--sm" data-action="cancel" ${status === "canceled" ? "disabled" : ""}>Cancel</button>
-                            <button class="btn btn--outline btn--sm" data-action="reschedule" ${status === "canceled" ? "disabled" : ""}>Reschedule</button>
+                            <button class="btn btn--ghost btn--small" data-action="cancel" ${status === "canceled" ? "disabled" : ""}>Cancel</button>
+                            <button class="btn btn--outline btn--small" data-action="reschedule" ${status === "canceled" ? "disabled" : ""}>Reschedule</button>
                         </div>
                         <div class="booking-item__resched"></div>
                     </div>
@@ -101,8 +101,8 @@ export async function openReschedulePanel({
     }
     resched.innerHTML = `
         <select class="booking-resched-select">${options.join("")}</select>
-        <button class="btn btn--primary btn--sm" data-action="confirm-reschedule">Confirm</button>
-        <button class="btn btn--ghost btn--sm" data-action="close-reschedule">Close</button>
+        <button class="btn btn--primary btn--small" data-action="confirm-reschedule">Confirm</button>
+        <button class="btn btn--ghost btn--small" data-action="close-reschedule">Close</button>
     `;
 }
 
@@ -172,16 +172,24 @@ export async function clearAllBookings({ db }) {
     let bookingSnap;
     do {
         bookingSnap = await db.collection("bookings").limit(300).get();
-        for (const doc of bookingSnap.docs) {
-            await db.collection("bookings").doc(doc.id).delete();
+        if (!bookingSnap.empty) {
+            const batch = db.batch();
+            for (const doc of bookingSnap.docs) {
+                batch.delete(db.collection("bookings").doc(doc.id));
+            }
+            await batch.commit();
         }
     } while (!bookingSnap.empty);
 
     let publicSnap;
     do {
         publicSnap = await db.collection("publicBookings").limit(300).get();
-        for (const doc of publicSnap.docs) {
-            await db.collection("publicBookings").doc(doc.id).delete();
+        if (!publicSnap.empty) {
+            const batch = db.batch();
+            for (const doc of publicSnap.docs) {
+                batch.delete(db.collection("publicBookings").doc(doc.id));
+            }
+            await batch.commit();
         }
     } while (!publicSnap.empty);
 }

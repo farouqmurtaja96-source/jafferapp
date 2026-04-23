@@ -47,6 +47,28 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
     }
 }
 
+async function parseAppsScriptResponse(response) {
+    const text = await response.text();
+    if (!response.ok) {
+        let parsedError = null;
+        try {
+            parsedError = text ? JSON.parse(text) : null;
+        } catch {}
+        return {
+            success: false,
+            message: parsedError?.message || `Apps Script request failed (${response.status}).`,
+        };
+    }
+    try {
+        return text ? JSON.parse(text) : {};
+    } catch (err) {
+        return {
+            success: false,
+            message: err?.message || "Apps Script returned invalid JSON.",
+        };
+    }
+}
+
 async function getAppsScriptWebAppUrl() {
     if (appsScriptUrlCache.value && Date.now() < appsScriptUrlCache.expiresAt) {
         return appsScriptUrlCache.value;
@@ -71,30 +93,20 @@ async function callAppsScript(action, payload = {}, { allowGet = false } = {}) {
 
     try {
         const body = { action, ...payload };
-        const requestUrl = allowGet
-            ? `${webAppUrl}?${toQueryString(body)}`
-            : webAppUrl;
-        const res = await fetchWithTimeout(requestUrl, allowGet
-            ? { method: "GET" }
-            : {
-                method: "POST",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify(body),
-            });
-        const text = await res.text();
-        const parsed = text ? JSON.parse(text) : {};
-        return parsed;
+        const requestUrl = allowGet ? `${webAppUrl}?${toQueryString(body)}` : webAppUrl;
+        const res = await fetchWithTimeout(
+            requestUrl,
+            allowGet
+                ? { method: "GET" }
+                : {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify(body),
+                },
+            allowGet ? 15000 : 12000
+        );
+        return parseAppsScriptResponse(res);
     } catch (err) {
-        if (allowGet) {
-            try {
-                const qs = toQueryString({ action, ...payload });
-                const res = await fetchWithTimeout(`${webAppUrl}?${qs}`, { method: "GET" }, 12000);
-                const text = await res.text();
-                return text ? JSON.parse(text) : {};
-            } catch (getErr) {
-                return { success: false, message: getErr?.message || String(getErr) };
-            }
-        }
         return { success: false, message: err?.message || String(err) };
     }
 }

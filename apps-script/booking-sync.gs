@@ -121,6 +121,19 @@ function listEvents_(calendarId, start, end) {
   });
 }
 
+function hasConflictingEvent_(calendarIds, start, end) {
+  for (var i = 0; i < calendarIds.length; i += 1) {
+    const events = listEvents_(calendarIds[i], start, end);
+    for (var j = 0; j < events.length; j += 1) {
+      const event = events[j];
+      if (start.getTime() < Number(event.end || 0) && end.getTime() > Number(event.start || 0)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function findBookingEvent_(cal, eventId, bookingId, slot) {
   if (eventId) {
     try {
@@ -234,13 +247,13 @@ function handleRequest_(e) {
           additionalCalendars: (config.additionalCalendarIds || []).length,
         }
       };
-      cache.put(cacheKey, JSON.stringify(payload), 20);
+      cache.put(cacheKey, JSON.stringify(payload), 120);
       return jsonOut(payload);
     }
 
     if (action === 'createBooking') {
       const slot = Number(req.slot || 0);
-      const durationMinutes = 50;
+      const durationMinutes = Math.max(15, Math.min(240, Number(req.durationMinutes || 50)));
       const timeZone = req.timeZone || config.defaultTimeZone;
       const name = req.name || 'Student';
       const email = req.email || '';
@@ -253,6 +266,12 @@ function handleRequest_(e) {
       }
       const start = new Date(slot);
       const end = new Date(slot + durationMinutes * 60 * 1000);
+      if (hasConflictingEvent_(getBusyCalendarIds_(config), start, end)) {
+        return jsonOut({
+          success: false,
+          message: 'That slot is no longer available. Please choose another time.'
+        });
+      }
       const cal = CalendarApp.getCalendarById(config.primaryCalendarId);
       if (!cal) {
         return jsonOut({ success: false, message: 'Primary calendar not found.' });

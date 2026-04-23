@@ -105,7 +105,6 @@ main.site-shell {
 }
 
 .section-copy,
-.section-copy,
 .small-note,
 .status-line {
     color: var(--muted);
@@ -274,7 +273,6 @@ main.site-shell {
         linear-gradient(135deg, rgba(255, 250, 243, 0.96), rgba(248, 238, 226, 0.92)),
         var(--surface);
 }
-.teacher-banner h3,
 .teacher-banner h3 {
     margin: 6px 0 8px;
     font-size: clamp(1.35rem, 2vw, 1.9rem);
@@ -899,7 +897,6 @@ main.site-shell {
         width: min(100% - 20px, 1180px);
     }
 
-    .site-header__inner,
     .panel__head,
     .week-nav {
         grid-template-columns: 1fr;
@@ -958,7 +955,6 @@ main.site-shell {
         padding: 20px;
     }
 
-    .site-nav,
     .action-row {
         width: 100%;
     }
@@ -968,7 +964,6 @@ main.site-shell {
         flex-direction: column;
     }
 
-    .site-nav .nav-link,
     .action-row .btn {
         width: 100%;
     }
