@@ -40,6 +40,11 @@ export function getZonedParts(date, timeZone) {
     };
 }
 
+function getZonedDateKey(date, timeZone) {
+    const parts = getZonedParts(date, timeZone);
+    return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
 function getTimeZoneOffsetMs(timeZone, date) {
     const parts = getZonedParts(date, timeZone);
     const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second || 0);
@@ -167,11 +172,28 @@ export async function getSchedulableSlots(daysToShow = 14, deps, options = {}) {
     const occupiedMinutes = bookingSettings.totalSlotMinutes || slotMinutes;
     const teacherTimezone = bookingSettings.timezone || getLocalTimezone() || "UTC";
     const now = Date.now();
-    const todayParts = getZonedParts(new Date(now), teacherTimezone);
-    const teacherToday = `${todayParts.year}-${String(todayParts.month).padStart(2, "0")}-${String(todayParts.day).padStart(2, "0")}`;
+    const requestedRangeStartMs = Number.isFinite(options.rangeStartMs)
+        ? Number(options.rangeStartMs)
+        : now;
+    const requestedRangeEndMs = Number.isFinite(options.rangeEndMs)
+        ? Number(options.rangeEndMs)
+        : (requestedRangeStartMs + (daysToShow + 3) * 24 * 60 * 60 * 1000);
+    const effectiveRangeStartMs = Math.max(now, requestedRangeStartMs);
+    const teacherRangeStart = getZonedDateKey(
+        new Date(effectiveRangeStartMs - 24 * 60 * 60 * 1000),
+        teacherTimezone
+    );
+    const teacherRangeEnd = getZonedDateKey(
+        new Date(requestedRangeEndMs + 24 * 60 * 60 * 1000),
+        teacherTimezone
+    );
     const teacherDateKeys = [];
-    for (let i = 0; i < daysToShow + 3; i++) {
-        teacherDateKeys.push(addDaysToDateKey(teacherToday, i));
+    for (
+        let dateKey = teacherRangeStart;
+        dateKey <= teacherRangeEnd;
+        dateKey = addDaysToDateKey(dateKey, 1)
+    ) {
+        teacherDateKeys.push(dateKey);
     }
 
     function addCandidateRange(dateKey, rangeStartMin, rangeEndMin) {
@@ -182,7 +204,9 @@ export async function getSchedulableSlots(daysToShow = 14, deps, options = {}) {
             const hour = Math.floor(minute / 60);
             const mins = minute % 60;
             const ts = zonedDateTimeToUtcMs(teacherTimezone, year, month, day, hour, mins);
-            if (ts >= now) candidateStarts.push(ts);
+            if (ts >= effectiveRangeStartMs && ts < requestedRangeEndMs) {
+                candidateStarts.push(ts);
+            }
         }
     }
 

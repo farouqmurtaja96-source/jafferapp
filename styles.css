@@ -942,13 +942,14 @@ main.site-shell {
     .week-grid {
         display: flex;
         grid-template-columns: none;
-        gap: 12px;
+        gap: 14px;
         overflow-x: auto;
         margin: 0 -20px;
-        padding: 2px 20px 12px;
+        padding: 4px 20px 16px;
         scroll-padding: 20px;
         scroll-snap-type: x mandatory;
         scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
     }
 
     .panel,
@@ -982,29 +983,52 @@ main.site-shell {
 
     .booking-day-column {
         display: block;
-        flex: 0 0 min(82vw, 340px);
+        flex: 0 0 min(88vw, 360px);
         min-height: auto;
-        padding: 16px;
+        padding: 18px;
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 242, 233, 0.96));
+        box-shadow: 0 14px 28px rgba(31, 41, 55, 0.1);
         scroll-snap-align: start;
     }
 
     .booking-day-column.is-focused {
         display: block;
+        border-color: rgba(15, 118, 110, 0.34);
+        box-shadow: 0 18px 34px rgba(15, 118, 110, 0.14);
     }
 
     .booking-day-header {
-        margin-bottom: 10px;
-        padding: 0 2px;
+        margin-bottom: 12px;
+        padding: 0;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid rgba(91, 100, 113, 0.1);
+        padding-bottom: 10px;
+    }
+
+    .booking-day-label {
+        font-size: 1rem;
+    }
+
+    .booking-day-date {
+        font-size: 0.84rem;
     }
 
     .booking-day-slots {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
     }
 
     .slot-btn {
-        padding: 14px 16px;
-        font-size: 1rem;
+        min-height: 50px;
+        padding: 12px 10px;
+        font-size: 0.96rem;
         border-radius: 16px;
+        text-align: center;
+        justify-content: center;
     }
 
     .selection-card {
@@ -1023,5 +1047,11 @@ main.site-shell {
     .status-check .btn,
     .contact-card .btn {
         min-height: 48px;
+    }
+
+    .booking-day-empty {
+        grid-column: 1 / -1;
+        padding: 10px 4px 2px;
+        text-align: center;
     }
 }

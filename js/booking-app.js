@@ -36,8 +36,7 @@ const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_TIMEZONE = "Africa/Cairo";
 const GOOGLE_BUSY_REFRESH_MS = 60000;
 const STUDENT_CHANGE_CUTOFF_MS = 12 * 60 * 60 * 1000;
-const BUSY_BLOCKS_CACHE_MS = 30000;
-const BOOKING_GRID_CACHE_MS = 15000;
+const BUSY_BLOCKS_CACHE_MS = 10000;
 
 const state = {
     bookingSettings: ensureBookingSettingsShape(createInitialBookingSettings()),
@@ -60,8 +59,6 @@ const state = {
     googleCalendarModuleLoading: null,
     publicSettingsLoaded: false,
     bookingCalendarLoaded: false,
-    scheduleCache: new Map(),
-    schedulePreloadTimer: null,
     busyBlocksFetchedAt: 0,
     busySyncReady: false,
     busySyncMessage: "",
@@ -471,62 +468,6 @@ function bookingDeps() {
     };
 }
 
-function getScheduleCacheKey(daysToShow) {
-    const busyFingerprint = (Array.isArray(state.runtimeBusyBlocks) ? state.runtimeBusyBlocks : [])
-        .slice(0, 80)
-        .map((block) => `${block.startMs || block.date || ""}:${block.endMs || `${block.start || ""}-${block.end || ""}`}`)
-        .join("|");
-    return JSON.stringify({
-        daysToShow,
-        weekOffset: state.bookingWeekOffset,
-        timezone: state.bookingSettings.timezone || "",
-        slotMinutes: state.bookingSettings.slotMinutes || 50,
-        totalSlotMinutes: state.bookingSettings.totalSlotMinutes || 50,
-        breakMinutes: state.bookingSettings.breakMinutes || 0,
-        exceptions: JSON.stringify(state.bookingSettings.exceptions || []),
-        runtimeBusyBlocks: busyFingerprint,
-    });
-}
-
-function readScheduleCache(cacheKey) {
-    const entry = state.scheduleCache.get(cacheKey);
-    if (!entry) return null;
-    if (Date.now() - entry.at >= BOOKING_GRID_CACHE_MS) {
-        state.scheduleCache.delete(cacheKey);
-        return null;
-    }
-    return entry.schedule;
-}
-
-function writeScheduleCache(cacheKey, schedule) {
-    state.scheduleCache.set(cacheKey, {
-        at: Date.now(),
-        schedule,
-    });
-}
-
-function clearScheduleCache() {
-    state.scheduleCache.clear();
-}
-
-function primeExtendedBookingSchedule() {
-    if (!state.busySyncReady || !window.db) return;
-    if (state.schedulePreloadTimer) {
-        window.clearTimeout(state.schedulePreloadTimer);
-    }
-    state.schedulePreloadTimer = window.setTimeout(async () => {
-        try {
-            const preloadDays = Math.max(21, (state.bookingWeekOffset + 3) * 7);
-            const cacheKey = getScheduleCacheKey(preloadDays);
-            if (readScheduleCache(cacheKey)) return;
-            const schedule = await getSchedulableSlots(preloadDays, bookingDeps());
-            writeScheduleCache(cacheKey, schedule);
-        } catch (error) {
-            console.error("Could not preload extended booking schedule.", error);
-        }
-    }, 120);
-}
-
 async function refreshRuntimeBusyBlocks({ force = false } = {}) {
     if (!force && state.busySyncReady && Date.now() - state.busyBlocksFetchedAt < BUSY_BLOCKS_CACHE_MS) {
         return state.runtimeBusyBlocks;
@@ -551,14 +492,15 @@ async function refreshRuntimeBusyBlocksNow({ force = false } = {}) {
         return;
     }
     const result = await window.fetchBusyBlocksFromAppsScript({
-        days: 21,
+        days: 14,
         timeZone: state.bookingSettings.timezone || getLocalTimezone(),
     });
     state.busySyncReady = !!(result?.success && Array.isArray(result.busyBlocks));
     state.busySyncMessage = state.busySyncReady ? "" : (result?.message || "Could not reach Google Calendar sync.");
-    state.runtimeBusyBlocks = state.busySyncReady ? result.busyBlocks : [];
+    state.runtimeBusyBlocks = state.busySyncReady
+        ? [...result.busyBlocks].sort((a, b) => Number(a.startMs || 0) - Number(b.startMs || 0))
+        : [];
     state.busyBlocksFetchedAt = Date.now();
-    clearScheduleCache();
 }
 
 async function refreshGoogleBusyAndCalendar({ silent = true } = {}) {
@@ -622,14 +564,13 @@ async function renderBookingCalendar() {
         return;
     }
 
-    const daysToShow = Math.max(7, (state.bookingWeekOffset + 1) * 7);
-    const scheduleCacheKey = getScheduleCacheKey(daysToShow);
-    const cachedSchedule = readScheduleCache(scheduleCacheKey);
-    const schedule = cachedSchedule || await getSchedulableSlots(daysToShow, bookingDeps());
-    if (!cachedSchedule) {
-        writeScheduleCache(scheduleCacheKey, schedule);
-    }
     const weekStart = getWeekStart(state.bookingWeekOffset);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    const schedule = await getSchedulableSlots(7, bookingDeps(), {
+        rangeStartMs: weekStart.getTime(),
+        rangeEndMs: weekEnd.getTime(),
+    });
     const days = [];
 
     for (let i = 0; i < 7; i += 1) {
@@ -653,9 +594,9 @@ async function renderBookingCalendar() {
     state.visibleDateKey = fallbackVisibleDate;
 
     if (els.bookingWeekLabel) {
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        els.bookingWeekLabel.textContent = `${weekStart.toLocaleDateString([], { month: "short", day: "numeric" })} - ${weekEnd.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+        const weekLabelEnd = new Date(weekStart);
+        weekLabelEnd.setDate(weekStart.getDate() + 6);
+        els.bookingWeekLabel.textContent = `${weekStart.toLocaleDateString([], { month: "short", day: "numeric" })} - ${weekLabelEnd.toLocaleDateString([], { month: "short", day: "numeric" })}`;
     }
 
     if (!els.bookingWeeklyGrid) return;
@@ -714,8 +655,6 @@ async function renderBookingCalendar() {
         const stillAvailable = schedule.some((slot) => slot.available && slot.startMs === state.selectedSlotMs);
         if (!stillAvailable) setSelectedSlot(null);
     }
-
-    primeExtendedBookingSchedule();
 }
 
 async function loadBookingStatus(email) {

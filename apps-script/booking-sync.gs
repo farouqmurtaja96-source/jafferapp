@@ -151,19 +151,24 @@ function findBookingEvent_(cal, eventId, bookingId, slot) {
 }
 
 function buildBusyBlocks_(events, timeZone) {
-  return events.map(function (event) {
-    const start = new Date(event.start);
-    const end = new Date(event.end);
-    return {
-      startMs: start.getTime(),
-      endMs: end.getTime(),
-      date: Utilities.formatDate(start, timeZone, 'yyyy-MM-dd'),
-      start: Utilities.formatDate(start, timeZone, 'HH:mm'),
-      end: Utilities.formatDate(end, timeZone, 'HH:mm'),
-      note: event.title || 'Busy',
-      sourceEventId: event.id || '',
-    };
-  });
+  return events
+    .slice()
+    .sort(function (a, b) {
+      return Number(a.start || 0) - Number(b.start || 0);
+    })
+    .map(function (event) {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      return {
+        startMs: start.getTime(),
+        endMs: end.getTime(),
+        date: Utilities.formatDate(start, timeZone, 'yyyy-MM-dd'),
+        start: Utilities.formatDate(start, timeZone, 'HH:mm'),
+        end: Utilities.formatDate(end, timeZone, 'HH:mm'),
+        note: event.title || 'Busy',
+        sourceEventId: event.id || '',
+      };
+    });
 }
 
 function getBusyCacheKey_(calendarIds, days, timeZone) {
