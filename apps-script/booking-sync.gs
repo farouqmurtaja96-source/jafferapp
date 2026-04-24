@@ -61,6 +61,25 @@ function sendBookingNotificationEmail_(recipient, details) {
   return sendPlainEmail_(recipient, subject, body);
 }
 
+function sendBookingCancellationEmail_(recipient, details) {
+  const subject = 'Lesson booking canceled: ' + (details.name || 'Student');
+  const body = [
+    'A lesson booking was canceled.',
+    '',
+    'Canceled by: ' + (details.canceledBy || 'Student'),
+    'Student: ' + (details.name || ''),
+    'Email: ' + (details.email || ''),
+    'Phone: ' + (details.phone || ''),
+    'Slot: ' + (details.slotLabel || ''),
+    'Timezone: ' + (details.timeZone || ''),
+    'Booking ID: ' + (details.bookingId || ''),
+    '',
+    'Notes:',
+    details.notes || 'None'
+  ].join('\n');
+  return sendPlainEmail_(recipient, subject, body);
+}
+
 function sendStudentConfirmationEmail_(recipient, details) {
   const subject = 'Your lesson booking is confirmed';
   const body = [
@@ -365,6 +384,13 @@ function handleRequest_(e) {
       const eventId = req.eventId || '';
       const bookingId = req.bookingId || '';
       const slot = Number(req.slot || 0);
+      const timeZone = req.timeZone || config.defaultTimeZone;
+      const teacherEmail = normalizeEmail_(req.teacherEmail || config.notificationEmail);
+      const name = req.name || 'Student';
+      const email = req.email || '';
+      const phone = req.phone || '';
+      const notes = req.notes || '';
+      const canceledBy = req.canceledBy || 'Student';
       if (!eventId && !bookingId) {
         return jsonOut({ success: false, message: 'Missing Google Calendar event ID or booking ID.' });
       }
@@ -373,30 +399,51 @@ function handleRequest_(e) {
         return jsonOut({ success: false, message: 'Primary calendar not found.' });
       }
       var event = null;
+      var alreadyDeleted = false;
+      var ignoredError = '';
       try {
         event = findBookingEvent_(cal, eventId, bookingId, slot);
       } catch (eventLookupErr) {
-        return jsonOut({
-          success: true,
-          message: 'Calendar event was already removed.',
-          alreadyDeleted: true,
-          ignoredError: eventLookupErr && eventLookupErr.message ? eventLookupErr.message : String(eventLookupErr),
-        });
+        alreadyDeleted = true;
+        ignoredError = eventLookupErr && eventLookupErr.message ? eventLookupErr.message : String(eventLookupErr);
       }
       if (!event) {
-        return jsonOut({ success: true, message: 'Calendar event was already removed.' });
+        alreadyDeleted = true;
+      } else {
+        try {
+          event.deleteEvent();
+        } catch (deleteErr) {
+          alreadyDeleted = true;
+          ignoredError = deleteErr && deleteErr.message ? deleteErr.message : String(deleteErr);
+        }
       }
+      var cancellationNotificationSent = false;
+      var cancellationNotificationError = '';
       try {
-        event.deleteEvent();
-      } catch (deleteErr) {
-        return jsonOut({
-          success: true,
-          message: 'Calendar event was already removed.',
-          alreadyDeleted: true,
-          ignoredError: deleteErr && deleteErr.message ? deleteErr.message : String(deleteErr),
+        cancellationNotificationSent = sendBookingCancellationEmail_(teacherEmail, {
+          name: name,
+          email: email,
+          phone: phone,
+          notes: notes,
+          bookingId: bookingId,
+          timeZone: timeZone,
+          slotLabel: slot ? Utilities.formatDate(new Date(slot), timeZone, 'yyyy-MM-dd HH:mm') : '',
+          canceledBy: canceledBy
         });
+        if (!cancellationNotificationSent) {
+          cancellationNotificationError = teacherEmail ? 'Cancellation notification email was not accepted.' : 'Teacher email is missing.';
+        }
+      } catch (mailErr) {
+        cancellationNotificationError = mailErr && mailErr.message ? mailErr.message : String(mailErr);
       }
-      return jsonOut({ success: true, message: 'Calendar event deleted.' });
+      return jsonOut({
+        success: true,
+        message: alreadyDeleted ? 'Calendar event was already removed.' : 'Calendar event deleted.',
+        alreadyDeleted: alreadyDeleted,
+        ignoredError: ignoredError,
+        cancellationNotificationSent: cancellationNotificationSent,
+        cancellationNotificationError: cancellationNotificationError
+      });
     }
 
     return jsonOut({ success: false, message: 'Unknown action.' });

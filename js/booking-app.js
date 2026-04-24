@@ -828,6 +828,14 @@ async function cancelStudentBooking(bookingId) {
             eventId: booking.googleCalendarEventId,
             bookingId,
             slot: booking.slot || 0,
+            durationMinutes: booking.slotMinutes || state.bookingSettings.slotMinutes || 50,
+            timeZone: booking.timezone || getTeacherTimezone(),
+            teacherEmail: (state.contactSettings?.email || "").trim(),
+            name: booking.name || getStudentName(),
+            email: booking.email || state.currentUser?.email || "",
+            phone: booking.phone || getStudentPhone(),
+            notes: booking.notes || "",
+            canceledBy: "Student",
         });
         if (result?.success === false && !isAlreadyDeletedCalendarEvent(result)) {
             throw new Error(normalizeAppsScriptStudentError(result, "Could not remove this booking from Google Calendar."));
