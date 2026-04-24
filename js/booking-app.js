@@ -354,12 +354,10 @@ function getTimeKey(date, timeZone = getDisplayTimezone()) {
     return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
 }
 
-function getWeekStartDateKey(offset = 0, timeZone = getDisplayTimezone()) {
+function getScheduleStartDateKey(offset = 0, timeZone = getDisplayTimezone()) {
     const nowParts = getZonedParts(new Date(), timeZone);
     const todayKey = `${nowParts.year}-${String(nowParts.month).padStart(2, "0")}-${String(nowParts.day).padStart(2, "0")}`;
-    const weekdayMap = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
-    const mondayDistance = weekdayMap[nowParts.weekday] ?? 0;
-    return addDaysToDateKey(todayKey, offset * 7 - mondayDistance);
+    return addDaysToDateKey(todayKey, offset * 7);
 }
 
 function formatDateKey(dateKey, options = {}) {
@@ -637,7 +635,7 @@ async function renderBookingCalendar() {
         return;
     }
 
-    const weekStartDateKey = getWeekStartDateKey(state.bookingWeekOffset, timezone);
+    const weekStartDateKey = getScheduleStartDateKey(state.bookingWeekOffset, timezone);
     const weekEndDateKey = addDaysToDateKey(weekStartDateKey, 7);
     const [startYear, startMonth, startDay] = weekStartDateKey.split("-").map(Number);
     const [endYear, endMonth, endDay] = weekEndDateKey.split("-").map(Number);
@@ -761,19 +759,35 @@ async function loadStudentBookings() {
         return;
     }
     try {
-        const snap = await window.db
-            .collection("bookings")
-            .where("studentUid", "==", state.currentUser.uid)
-            .orderBy("slot", "desc")
-            .limit(10)
-            .get();
+        let snap;
+        try {
+            snap = await window.db
+                .collection("bookings")
+                .where("studentUid", "==", state.currentUser.uid)
+                .orderBy("slot", "desc")
+                .limit(10)
+                .get();
+        } catch (queryError) {
+            const code = queryError?.code || "";
+            const message = String(queryError?.message || "");
+            const needsIndex = code === "failed-precondition" || message.toLowerCase().includes("index");
+            if (!needsIndex) {
+                throw queryError;
+            }
+            snap = await window.db
+                .collection("bookings")
+                .where("studentUid", "==", state.currentUser.uid)
+                .limit(50)
+                .get();
+        }
         const rows = [];
         snap.forEach((doc) => rows.push({ id: doc.id, ...(doc.data() || {}) }));
+        rows.sort((a, b) => (b.slot || 0) - (a.slot || 0));
         if (!rows.length) {
             els.bookingStatusList.innerHTML = "<div class=\"small-note\">No bookings yet.</div>";
             return;
         }
-        els.bookingStatusList.innerHTML = rows.map((b) => {
+        els.bookingStatusList.innerHTML = rows.slice(0, 10).map((b) => {
             const status = (b.status || "booked").toLowerCase();
             const label = status === "canceled" ? "Canceled" : status === "rescheduled" ? "Rescheduled" : "Booked";
             const canChange = status !== "canceled" && Number(b.slot || 0) - Date.now() >= STUDENT_CHANGE_CUTOFF_MS;

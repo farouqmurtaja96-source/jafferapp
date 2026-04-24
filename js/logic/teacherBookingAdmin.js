@@ -10,16 +10,32 @@ export async function renderTeacherBookings({
     bookingCache.clear();
     try {
         const now = Date.now() - 3600000;
-        const snap = await db
-            .collection("bookings")
-            .where("slot", ">=", now)
-            .orderBy("slot")
-            .limit(200)
-            .get();
+        let snap;
+        try {
+            snap = await db
+                .collection("bookings")
+                .where("slot", ">=", now)
+                .orderBy("slot")
+                .limit(200)
+                .get();
+        } catch (queryError) {
+            const code = queryError?.code || "";
+            const message = String(queryError?.message || "");
+            const needsIndex = code === "failed-precondition" || message.toLowerCase().includes("index");
+            if (!needsIndex) {
+                throw queryError;
+            }
+            snap = await db
+                .collection("bookings")
+                .orderBy("slot")
+                .limit(400)
+                .get();
+        }
         const items = [];
         snap.forEach((doc) => {
             const data = doc.data();
             if (!data || !data.slot) return;
+            if (data.slot < now) return;
             items.push({ id: doc.id, ...data });
         });
         if (!items.length) {
