@@ -256,6 +256,12 @@
                             <button type="submit" class="btn btn--primary">Save Apps Script URL</button>
                             <button id="appsScriptTestBtn" type="button" class="btn btn--outline">Test Apps Script</button>
                             <button id="appsScriptRefreshBusyBtn" type="button" class="btn btn--ghost">Import Busy via Apps Script</button>
+                            <button id="appsScriptQuotaBtn" type="button" class="btn btn--ghost">Refresh Email Quota</button>
+                        </div>
+                        <div class="quota-meter" id="appsScriptEmailQuota" hidden>
+                            <span class="quota-meter__label">Email quota today</span>
+                            <strong id="appsScriptEmailQuotaValue">--</strong>
+                            <span class="quota-meter__hint">remaining recipients</span>
                         </div>
                         <p id="appsScriptMsg" class="status-line"></p>
                     </form>

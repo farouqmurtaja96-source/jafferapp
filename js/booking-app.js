@@ -141,6 +141,9 @@ function cacheDom() {
         "appsScriptMsg",
         "appsScriptTestBtn",
         "appsScriptRefreshBusyBtn",
+        "appsScriptQuotaBtn",
+        "appsScriptEmailQuota",
+        "appsScriptEmailQuotaValue",
         "exceptionForm",
         "exceptionDate",
         "exceptionStart",
@@ -1370,6 +1373,30 @@ async function refreshTeacherBookings() {
     });
 }
 
+function updateEmailQuotaUi(result) {
+    if (!els.appsScriptEmailQuota || !els.appsScriptEmailQuotaValue) return;
+    if (!result?.success || !Number.isFinite(Number(result.emailQuotaRemaining))) {
+        els.appsScriptEmailQuota.hidden = true;
+        return;
+    }
+    els.appsScriptEmailQuota.hidden = false;
+    els.appsScriptEmailQuotaValue.textContent = String(Number(result.emailQuotaRemaining));
+}
+
+async function refreshAppsScriptEmailQuota({ silent = true } = {}) {
+    if (typeof window.getAppsScriptEmailQuota !== "function") return null;
+    const result = await window.getAppsScriptEmailQuota();
+    updateEmailQuotaUi(result);
+    if (!silent) {
+        setStatus(
+            els.appsScriptMsg,
+            result?.success ? "Email quota refreshed." : (result?.message || "Could not load email quota."),
+            result?.success ? "success" : "error"
+        );
+    }
+    return result;
+}
+
 async function refreshGoogleCalendarStatus() {
     if (!state.teacherUser || state.teacherRole !== "teacher") {
         setStatus(els.googleCalendarStatus, "Sign in as a teacher to manage Google Calendar.");
@@ -1502,6 +1529,7 @@ function wireTeacherActions() {
 
     els.appsScriptTestBtn?.addEventListener("click", async (event) => {
         const result = await withButtonLoading(event.currentTarget, "Testing...", () => window.testAppsScriptConnection?.());
+        updateEmailQuotaUi(result);
         setStatus(els.appsScriptMsg, result?.message || "Apps Script test finished.", result?.success ? "success" : "error");
     });
 
@@ -1513,6 +1541,12 @@ function wireTeacherActions() {
         setStatus(els.appsScriptMsg, state.runtimeBusyBlocks.length
             ? `Loaded ${state.runtimeBusyBlocks.length} busy blocks from Apps Script.`
             : "Apps Script busy blocks refreshed.", "success");
+    });
+
+    els.appsScriptQuotaBtn?.addEventListener("click", (event) => {
+        withButtonLoading(event.currentTarget, "Refreshing...", () => refreshAppsScriptEmailQuota({ silent: false })).catch((error) => {
+            setStatus(els.appsScriptMsg, error.message || "Could not load email quota.", "error");
+        });
     });
 
     els.exceptionForm?.addEventListener("submit", async (event) => {
@@ -1800,6 +1834,7 @@ async function handleAuthState(user) {
         els.teacherPreplyCalendarId.value = teacherData.preplyCalendarId || teacherData.googleCalendar?.preplyCalendarId || "";
     }
     await refreshTeacherDashboard();
+    refreshAppsScriptEmailQuota().catch(console.error);
     showScreen("teacher-screen");
 }
 

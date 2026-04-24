@@ -32,6 +32,17 @@ function sendPlainEmail_(recipient, subject, body) {
   return true;
 }
 
+function getEmailQuotaPayload_() {
+  const remaining = MailApp.getRemainingDailyQuota();
+  return {
+    success: true,
+    message: 'Email quota loaded.',
+    emailQuotaRemaining: remaining,
+    quotaType: 'remaining_daily_recipients',
+    resetWindow: 'Google resets quotas about 24 hours after the first send.',
+  };
+}
+
 function sendBookingNotificationEmail_(recipient, details) {
   const subject = 'New lesson booking: ' + (details.name || 'Student');
   const body = [
@@ -215,7 +226,12 @@ function handleRequest_(e) {
         timeZone: config.defaultTimeZone,
         preplyCalendarId: config.preplyCalendarId || '',
         additionalCalendarCount: (config.additionalCalendarIds || []).length,
+        emailQuotaRemaining: getEmailQuotaPayload_().emailQuotaRemaining,
       });
+    }
+
+    if (action === 'getEmailQuota') {
+      return jsonOut(getEmailQuotaPayload_());
     }
 
     if (action === 'getBusy') {

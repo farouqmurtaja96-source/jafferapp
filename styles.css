@@ -611,6 +611,32 @@ main.site-shell {
     gap: 12px;
 }
 
+.quota-meter {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    width: fit-content;
+    padding: 12px 14px;
+    border: 1px solid rgba(15, 118, 110, 0.16);
+    border-radius: 14px;
+    background: rgba(15, 118, 110, 0.08);
+    color: var(--primary-dark);
+}
+
+.quota-meter[hidden] {
+    display: none;
+}
+
+.quota-meter__label,
+.quota-meter__hint {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.quota-meter strong {
+    font-size: 1.25rem;
+}
+
 .contact-card {
     border: 1px solid rgba(91, 100, 113, 0.14);
     border-radius: 22px;
